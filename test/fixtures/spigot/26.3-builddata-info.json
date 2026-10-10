@@ -1,0 +1,13 @@
+{
+	"minecraftVersion": "26.3",
+    "spigotVersion": "26.3-R0.1-SNAPSHOT",
+	"minecraftHash": "c275c1dea52fb266dce886b269f49f34c1c0e26472779a88eb5cc6cf30363ad7",
+	"serverUrl": "https://piston-data.mojang.com/v1/objects/33680f5f2ac32864d6d7cf5e56a705fdb3e05f4c/server.jar",
+	"accessTransforms": "bukkit.at",
+	"packageMappings": "package.srg",
+	"classMapCommand": "",
+	"memberMapCommand": "",
+	"finalMapCommand": "java -jar BuildData/bin/SpecialSource.jar -i {0} --access-transformer {1} -m {2} -o {3}",
+	"decompileCommand": "java -jar BuildData/bin/fernflower.jar -dgs=1 -hdc=0 -asc=1 -udv=0 -rsy=1 -aoa=1 {0} {1}",
+	"toolsVersion": 197
+}

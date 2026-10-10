@@ -26,7 +26,7 @@ const Coord = z
     versions: z.array(z.string()).min(1),
     repository: z.string().url(),
     metadataUrl: z.string().url(),
-    classifier: z.string().optional(),
+    classifier: z.string().nullable().optional(),
   })
   .strict();
 

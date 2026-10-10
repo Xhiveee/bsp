@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata modelVersion="1.1.0">
+  <groupId>com.destroystokyo.paper</groupId>
+  <artifactId>paper-api</artifactId>
+  <versioning>
+    <latest>1.16.5-R0.1-SNAPSHOT</latest>
+    <versions>
+      <version>1.16.5-R0.1-SNAPSHOT</version>
+    </versions>
+    <lastUpdated>20241021050427</lastUpdated>
+  </versioning>
+</metadata>

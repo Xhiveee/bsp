@@ -75,10 +75,10 @@ export function resolveProfile(
   mcVersion: string,
   facts: VersionFacts = {},
 ): ResolvedProfile {
-  const loader: ProfilePlatform = profile.platform;
+  const platform: ProfilePlatform = profile.platform;
   if (compareMcVersions(mcVersion, profile.minVersion) < 0) {
     throw new ProfileResolutionError(
-      `${loader}: Minecraft ${mcVersion} is older than the oldest supported version ${profile.minVersion}.`,
+      `${platform}: Minecraft ${mcVersion} is older than the oldest supported version ${profile.minVersion}.`,
     );
   }
   const warnings: string[] = [];
@@ -90,12 +90,12 @@ export function resolveProfile(
     matched.push(rule);
   }
   if (matched.length === 0) {
-    throw new ProfileResolutionError(`${loader}: no profile rule matches Minecraft ${mcVersion}.`);
+    throw new ProfileResolutionError(`${platform}: no profile rule matches Minecraft ${mcVersion}.`);
   }
   const parsed = ProfileFieldsSchema.safeParse(merged);
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
-    throw new ProfileResolutionError(`${loader} profile for ${mcVersion} is incomplete after merging rules: ${issues}`);
+    throw new ProfileResolutionError(`${platform} profile for ${mcVersion} is incomplete after merging rules: ${issues}`);
   }
   const fields: ProfileFields = parsed.data;
 
@@ -117,7 +117,7 @@ export function resolveProfile(
   }
   if (newer) {
     warnings.push(
-      `UNVERIFIED: Minecraft ${mcVersion} is newer than the newest version the ${loader} profile was verified against (${profile.testedUpTo}). ` +
+      `UNVERIFIED: Minecraft ${mcVersion} is newer than the newest version the ${platform} profile was verified against (${profile.testedUpTo}). ` +
         `Settings were extrapolated from the closest lower rule (since ${basedOn}). Build the project and, if anything differs, ` +
         `add a rule for ${mcVersion} in your user profiles directory.`,
     );
@@ -143,7 +143,7 @@ export function resolveProfile(
 
   return {
     ...fields,
-    platform: loader,
+    platform,
     mcVersion,
     java,
     obfuscated: facts.obfuscated ?? true,

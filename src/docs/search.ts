@@ -23,7 +23,7 @@ const FileRule = z.object({
   /** Page URL from the front matter `slug:` when present ({slug}); `url` otherwise. */
   slugUrl: z.string().optional(),
   fallbackUrl: z.string().optional(),
-  /** Extra topics for pages matched by this rule (e.g. the mixin pages inside a loader's docs). */
+  /** Extra topics for pages matched by this rule (e.g. adventure pages). */
   topics: z.array(z.string()).optional(),
 });
 const SourceSchema = z
@@ -32,9 +32,9 @@ const SourceSchema = z
     title: z.string(),
     platforms: z.array(z.enum(["paper", "spigot", "bukkit"])),
     kind: z.enum(["docs", "news"]).default("docs"),
-    /** Topics of every page of this source, e.g. [mixin]; docs_search can be restricted to one topic. */
+    /** Topics of every page of this source, e.g. [adventure]; docs_search can be restricted to one topic. */
     topics: z.array(z.string()).default([]),
-    /** false: the docs are not tied to Minecraft versions (e.g. the Mixin wiki); pages get version "any". */
+    /** false: the docs are not tied to Minecraft versions (e.g. Paper docs); pages get version "any". */
     versioned: z.boolean().default(true),
     /** Page title from the file name (GitHub wiki style: dashes are spaces) instead of the first heading. */
     titleFromName: z.boolean().default(false),

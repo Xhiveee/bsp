@@ -3,6 +3,7 @@ import { accessString, ACC, descToJava, methodToJava } from "../index/classfile.
 import type { IndexSpec } from "../index/service.js";
 import type { McIndex } from "../index/store.js";
 import { versionFacts, type Services } from "../services.js";
+import { compareMcVersions } from "../util/mcversion.js";
 import { clip, fail, okText, page } from "./result.js";
 import { extractMethods, paramsMatch } from "../index/javasrc.js";
 import { allInterfaces, allSubtypes, directSubtypes, findUsages, overrides, parseTarget, superChain, type Usage, type UsageTarget } from "../index/xref.js";
@@ -272,7 +273,8 @@ export async function translateMapping(services: Services, a: Translate) {
     const rest = cbm[1]!.replace(/\//g, ".");
     out.push(`CraftBukkit is not obfuscated; only the package differs.`);
     out.push(`Spigot ${a.mcVersion}: org.bukkit.craftbukkit.${pv ? `v${pv}.` : ""}${rest}`);
-    out.push(`Paper ${a.mcVersion}: org.bukkit.craftbukkit.${pv && !(await mojangRuntime(services, a.mcVersion)) ? `v${pv}.` : ""}${rest}${pv ? " (paperweight dev: unversioned; reobfJar relocates)" : ""}`);
+    const relocated = !!pv && !(await mojangRuntime(services, a.mcVersion));
+    out.push(`Paper ${a.mcVersion}: org.bukkit.craftbukkit.${relocated ? `v${pv}.` : ""}${rest}${relocated && compareMcVersions(a.mcVersion, "1.17") >= 0 ? " (with paperweight write it unversioned; reobfJar relocates)" : ""}`);
     out.push(`Portable: Bukkit.getServer().getClass().getPackage().getName() gives the runtime package.`);
     return okText(out.join("\n"));
   }
@@ -298,7 +300,7 @@ export async function translateMapping(services: Services, a: Translate) {
     if (r.kind === "class") out.push(`class  ${order.map((ns) => `${ns} ${r.names[ns] ? d(r.names[ns]!) : "?"}`).join(" | ")}`);
     else out.push(`${r.kind.padEnd(6)} ${order.map((ns) => `${ns} ${r.owner?.[ns] ? d(r.owner[ns]!).replace(/^.*\./, "") : "?"}#${r.names[ns] ?? "?"}${r.desc?.[ns] && r.kind === "method" ? r.desc[ns] : ""}`).join(" | ")}`);
   }
-  const head = `${res.length} match(es) for ${a.name} (${a.from}) in ${a.mcVersion}; namespaces ${table.namespaces.join(", ")}.${res.length && a.from === "spigot" ? " Spigot keeps many members obfuscated: obf = spigot there." : ""}`;
+  const head = `${res.length} match(es) for ${a.name} (${a.from}) in ${a.mcVersion}; namespaces ${table.namespaces.join(", ")}.${res.some((r) => r.kind !== "class") && table.namespaces.includes("spigot") ? " Spigot leaves most members obfuscated (spigot = obf)." : ""}`;
   return okText([head, ...out, ...notes.map((n) => `note: ${n}`)].join("\n"));
 }
 

@@ -5,37 +5,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig, type BspConfig } from "../src/config.js";
 import { createServices, type Services } from "../src/services.js";
-import { ENDPOINTS } from "../src/sources/endpoints.js";
 import { HttpError, type Fetcher, type FetchResult } from "../src/util/http.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const FIXTURES = path.join(here, "fixtures");
 export const fixture = (name: string) => readFileSync(path.join(FIXTURES, name), "utf8");
 
-/** URL → fixture file. Anything else is a 404, like a real maven repo. */
+/** URL → fixture file (captured from the live official endpoints, see test/fixtures/routes.json). Anything else is a 404. */
 export function fixtureRoutes(): Record<string, string> {
-  const routes: Record<string, string> = {
-    [ENDPOINTS.mojangManifest]: "mojang/version_manifest_v2.json",
-    [ENDPOINTS.fabricGame]: "fabric-game.json",
-    [ENDPOINTS.fabricLoader]: "fabric-loader.json",
-    [ENDPOINTS.fabricYarn("1.20.1")]: "fabric-yarn-1.20.1.json",
-    [ENDPOINTS.fabricYarn("26.3")]: "fabric-yarn-26.3.json",
-    [ENDPOINTS.fabricApiMetadata]: "fabric-api-metadata.xml",
-    [ENDPOINTS.forgeMetadata]: "forge-metadata.xml",
-    [ENDPOINTS.forgePromotions]: "forge-promotions_slim.json",
-    [ENDPOINTS.neoforgeMetadata]: "neoforge-metadata.xml",
-    [ENDPOINTS.neoforgeLegacyMetadata]: "neoforge-legacy-metadata.xml",
-    [ENDPOINTS.parchmentMetadata("1.20.1")]: "parchment-1.20.1-metadata.xml",
-    "https://maven.fabricmc.net/net/fabricmc/fabric-loom/maven-metadata.xml": "fabric-loom-metadata.xml",
-    "https://maven.neoforged.net/releases/net/neoforged/moddev/net.neoforged.moddev.gradle.plugin/maven-metadata.xml": "moddev-metadata.xml",
-    "https://maven.neoforged.net/releases/net/neoforged/moddev/legacyforge/net.neoforged.moddev.legacyforge.gradle.plugin/maven-metadata.xml":
-      "moddev-legacy-metadata.xml",
-    "https://maven.minecraftforge.net/net/minecraftforge/gradle/ForgeGradle/maven-metadata.xml": "forgegradle-metadata.xml",
-    "https://plugins.gradle.org/m2/net/minecraftforge/gradle/net.minecraftforge.gradle.gradle.plugin/maven-metadata.xml":
-      "forgegradle-plugin-metadata.xml",
-  };
-  const mojangUrls = JSON.parse(fixture("mojang/urls.json")) as Record<string, string>;
-  return { ...routes, ...mojangUrls };
+  return JSON.parse(fixture("routes.json")) as Record<string, string>;
 }
 
 export class FixtureFetcher implements Fetcher {

@@ -71,7 +71,7 @@ export function targetRelease(v: string): string | null {
 }
 
 
-/** Generic dotted-numeric comparison for loader/plugin versions ("0.92.12", "21.1.256", "2.0.148"). */
+/** Generic dotted-numeric comparison for artifact versions ("0.92.12", "21.1.256", "2.0.148"). */
 export function compareLooseVersions(a: string, b: string): number {
   const split = (s: string) => s.split(/[.+\-]/);
   const xa = split(a);

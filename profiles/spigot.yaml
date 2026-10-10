@@ -30,6 +30,7 @@ rules:
           group: org.spigotmc
           artifact: spigot
           versions: ["{mc}-R0.1-SNAPSHOT"]
+          classifier: null
           repository: https://hub.spigotmc.org/nexus/content/repositories/snapshots/
           metadataUrl: https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/maven-metadata.xml
         howTo: >-
@@ -85,6 +86,7 @@ rules:
           group: org.spigotmc
           artifact: spigot
           versions: ["{mc}-R0.1-SNAPSHOT"]
+          classifier: null
           repository: https://hub.spigotmc.org/nexus/content/repositories/snapshots/
           metadataUrl: https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/maven-metadata.xml
         howTo: >-

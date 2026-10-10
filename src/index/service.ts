@@ -11,7 +11,7 @@
 import AdmZip from "adm-zip";
 import { createHash } from "node:crypto";
 import { existsSync, readdirSync, statSync } from "node:fs";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { runProcess } from "../exec/run.js";
 import { readProjectInfo, type ProjectInfo } from "../project/info.js";
@@ -258,7 +258,9 @@ export class IndexService {
       if (hit) return hit;
       const jars = await this.unpackServerJar(file, path.join(dir, "work"), onProgress);
       onProgress?.(`Indexing ${path.basename(file)}…`);
-      return this.indexMerged(dir, jars, { kind, mcVersion: mc, label: `${kind === "spigot" ? "Spigot (BuildTools)" : "server jar"} ${path.basename(file)}`, notes: [] });
+      const idx = await this.indexMerged(dir, jars, { kind, mcVersion: mc, label: `${kind === "spigot" ? "Spigot (BuildTools)" : "server jar"} ${path.basename(file)}`, notes: [] });
+      await rm(path.join(dir, "work"), { recursive: true, force: true });
+      return idx;
     });
   }
 
@@ -278,7 +280,9 @@ export class IndexService {
       const file = await this.dl(d.url, path.join(this.services.config.cacheDir, "downloads", "paper", d.name), { sha256: d.sha256 });
       const jars = await this.unpackServerJar(file, path.join(dir, "work"), onProgress);
       onProgress?.("Indexing Paper server classes…");
-      return this.indexMerged(dir, jars, { kind: "paper", mcVersion: mc, label: `Paper ${mc} build ${build.id}`, notes: [] });
+      const idx = await this.indexMerged(dir, jars, { kind: "paper", mcVersion: mc, label: `Paper ${mc} build ${build.id}`, notes: [] });
+      await rm(path.join(dir, "work"), { recursive: true, force: true }); // patched jars are merged; keep only the index
+      return idx;
     });
   }
 

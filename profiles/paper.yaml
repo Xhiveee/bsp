@@ -71,8 +71,6 @@ rules:
       references:
         - https://docs.papermc.io/paper/dev/userdev
         - https://github.com/PaperMC/paperweight-test-plugin
-      notes:
-        - Dev bundles exist from 1.17.1 (get_profile checks the live dev-bundle metadata).
 
   - since: "1.19.3"
     description: Paper plugins (paper-plugin.yml, experimental)
@@ -91,7 +89,7 @@ rules:
       pluginYml: { apiVersion: full }
       addNotes:
         - "Paper 1.20.5+ runs on Mojang names and remaps Spigot-mapped plugins on first load. Ship the Mojang-mapped jar: paperweight.reobfArtifactConfiguration = ReobfArtifactConfiguration.MOJANG_PRODUCTION (and add `paperweight-mappings-namespace: mojang` to the manifest if you build without userdev)."
-        - CraftBukkit is no longer relocated: use org.bukkit.craftbukkit.* without a version segment.
+        - "CraftBukkit is no longer relocated: use org.bukkit.craftbukkit.* without a version segment."
 
   - when: { obfuscated: false }
     description: Unobfuscated Minecraft (26.1+) — Mojang names everywhere, reobfuscation impossible

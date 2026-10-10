@@ -1,6 +1,6 @@
 /**
  * Minimal JVM class-file reader: class header, fields, methods and (on demand) a walk over
- * method bytecode collecting the references Mixin injection points can target.
+ * method bytecode collecting its references (invokes, fields, constants).
  * Works for any class-file version (the format is append-only).
  */
 
@@ -201,7 +201,7 @@ export class ClassReader {
     return m;
   }
 
-  /** Walk a method's bytecode and collect references usable as Mixin @At targets. */
+  /** Walk a method's bytecode and collect its references. */
   analyze(m: MethodInfo): CodeRefs {
     const refs: CodeRefs = { invokes: [], fields: [], news: [], constants: [], returns: 0, instanceofs: [], jumps: 0, typedConstants: [], locals: [], jumpOps: [], seq: [] };
     if (!m.code) return refs;
