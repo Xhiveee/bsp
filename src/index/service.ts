@@ -370,7 +370,9 @@ export class IndexService {
         const sp = await this.spigotSet(mc, obfIdx.map((c) => c.n));
         if (!sp) throw new Error(`No Spigot BuildData class mappings for ${mc}.`);
         set = sp.set;
-        const modes = [...`${sp.mapCommands ?? ""}`.matchAll(/--auto-member (\w+)/g)].map((m) => m[1]!);
+        // SpecialSource auto-naming flags (older BuildData: --auto-synth = --auto-member SYNTHETIC)
+        const cmds = `${sp.mapCommands ?? ""}`;
+        const modes = [...cmds.matchAll(/--auto-member (\w+)/g)].map((m) => m[1]!).concat(/--auto-synth\b/.test(cmds) ? ["SYNTHETIC"] : []);
         if (modes.length) addSpigotAutoMembers(serverJar, set, modes);
         const fdesc = new Map(obfIdx.flatMap((c) => c.f.map(([n, d]) => [`${c.n}\t${n}`, d] as const)));
         fillFieldDescs(set, (o, n) => fdesc.get(`${o}\t${n}`));
