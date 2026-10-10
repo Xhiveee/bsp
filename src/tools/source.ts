@@ -292,15 +292,23 @@ export async function translateMapping(services: Services, a: Translate) {
     out.push(`note: ${a.mcVersion} has no versioned NMS package; searched by simple name.`);
   }
   const { table, notes } = await services.indexes.table(a.mcVersion);
-  if (!table.namespaces.includes(a.from)) return fail(`${a.from} names are not available for ${a.mcVersion}. Available: ${table.namespaces.join(", ")}. ${notes.join(" ")}`);
-  const res = table.find(name, a.from, a.kind, a.limit ?? 25);
+  if (a.from && !table.namespaces.includes(a.from)) return fail(`${a.from} names are not available for ${a.mcVersion}. Available: ${table.namespaces.join(", ")}. ${notes.join(" ")}`);
+  let from = a.from ?? "mojang";
+  let res = table.find(name, from, a.kind, a.limit ?? 25);
+  if (!a.from) {
+    for (const ns of ["mojang", "spigot", "obf"].filter((x) => table.namespaces.includes(x))) {
+      res = table.find(name, ns, a.kind, a.limit ?? 25);
+      from = ns as typeof from;
+      if (res.length) break;
+    }
+  }
   const order = [a.to, ...table.namespaces].filter((x, i, arr): x is string => !!x && arr.indexOf(x) === i);
   const d = (n: string) => n.replace(/\//g, ".");
   for (const r of res) {
     if (r.kind === "class") out.push(`class  ${order.map((ns) => `${ns} ${r.names[ns] ? d(r.names[ns]!) : "?"}`).join(" | ")}`);
     else out.push(`${r.kind.padEnd(6)} ${order.map((ns) => `${ns} ${r.owner?.[ns] ? d(r.owner[ns]!).replace(/^.*\./, "") : "?"}#${r.names[ns] ?? "?"}${r.desc?.[ns] && r.kind === "method" ? r.desc[ns] : ""}`).join(" | ")}`);
   }
-  const head = `${res.length} match(es) for ${a.name} (${a.from}) in ${a.mcVersion}; namespaces ${table.namespaces.join(", ")}.${res.some((r) => r.kind !== "class") && table.namespaces.includes("spigot") ? " Spigot leaves most members obfuscated (spigot = obf)." : ""}`;
+  const head = `${res.length} match(es) for ${a.name} (${from}) in ${a.mcVersion}; namespaces ${table.namespaces.join(", ")}.${res.some((r) => r.kind !== "class") && table.namespaces.includes("spigot") ? " Spigot leaves most members obfuscated (spigot = obf)." : ""}`;
   return okText([head, ...out, ...notes.map((n) => `note: ${n}`)].join("\n"));
 }
 

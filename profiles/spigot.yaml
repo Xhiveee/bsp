@@ -9,6 +9,7 @@ testedUpTo: "26.3"
 rules:
   - since: "1.13"
     description: Spigot 1.13–1.16.5 — NMS in net.minecraft.server.v1_X_RY (Spigot names)
+    verified: ["1.13.2", "1.16.5"]
     set:
       java: auto
       api:

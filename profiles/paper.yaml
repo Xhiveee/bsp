@@ -9,6 +9,7 @@ testedUpTo: "26.3"
 rules:
   - since: "1.13"
     description: Paper 1.13–1.16.5 — Spigot names, NMS/CraftBukkit in versioned packages (v1_X_RY)
+    verified: ["1.16.5"]
     set:
       java: auto
       api:
@@ -44,6 +45,7 @@ rules:
 
   - since: "1.17"
     description: Paper 1.17+ — io.papermc.paper group, paperweight-userdev (Mojang names in dev, reobf to Spigot names)
+    verified: ["1.20.1", "1.20.4"]
     set:
       api:
         group: io.papermc.paper
@@ -82,6 +84,7 @@ rules:
 
   - since: "1.20.5"
     description: Mojang-mapped runtime, no CraftBukkit relocation, api-version with patch
+    verified: ["1.21.11"]
     set:
       nms:
         runtimeMappings: mojang
@@ -98,6 +101,7 @@ rules:
 
   - when: { obfuscated: false }
     description: Unobfuscated Minecraft (26.1+) — Mojang names everywhere, reobfuscation impossible
+    verified: ["26.3"]
     set:
       nms:
         runtimeMappings: mojang

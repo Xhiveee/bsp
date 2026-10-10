@@ -54,7 +54,7 @@ export const getClassInput = {
 export const translateInput = {
   mcVersion: z.string(),
   name: z.string().describe("Class (a.b.C, simple name, v1_16_R3.EntityPlayer, org.bukkit.craftbukkit[.vX_Y_RZ].X), member (Owner#name[(desc)]) or bare member name."),
-  from: z.enum(NS).describe("Namespace of name (CraftBukkit names: any)."),
+  from: z.enum(NS).optional().describe("Namespace of name (default: first that matches: mojang, spigot, obf)."),
   to: z.enum(NS).optional().describe("Highlight this namespace."),
   kind: z.enum(["class", "field", "method"]).optional(),
   limit: z.number().int().min(1).max(100).optional(),
