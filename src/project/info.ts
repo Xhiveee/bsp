@@ -257,7 +257,8 @@ export async function readProjectInfo(dirIn: string): Promise<ProjectInfo> {
   }
   // module-only roots (aggregators) are fine: nms_validate walks their modules
   if (!mcVersion && !modules.length) throw new Error(`Could not determine the Minecraft version of ${dir}: no paper-api / spigot(-api) / bukkit / dev-bundle dependency with a literal version, and no api-version in plugin.yml.`);
-  const fileDep = deps.find((d) => d.systemPath && /\.jar$/.test(d.systemPath));
+  const fileDeps = deps.filter((d) => d.systemPath && /\.jar$/.test(d.systemPath));
+  const fileDep = fileDeps.find((d) => /paper|spigot|craftbukkit|server|patched/i.test(path.basename(d.systemPath!))) ?? fileDeps[0];
   const serverJar = fileDep?.systemPath ? path.resolve(dir, fileDep.systemPath.replace(/\$\{(project\.basedir|basedir)\}/g, dir)) : undefined;
   let nms: NmsKind = chosen?.nms ?? "none";
   if (nms === "none" && serverJar) nms = "server-file";

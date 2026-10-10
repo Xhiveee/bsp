@@ -59,6 +59,14 @@ async function requiredJvm(services: Services, info: ProjectInfo, gradle?: strin
     jvm = 21;
     why += "; paperweight-userdev needs JDK 21 to run (compiles for the target via toolchain)";
   }
+  // Maven compiles in-process: --release N needs javac 9+, so old targets build on a JDK 17 with release=N
+  if (info.build === "maven" && jvm < 17) {
+    const pom = await readFile(path.join(info.dir, "pom.xml"), "utf8").catch(() => "");
+    if (/<(maven\.compiler\.)?release>/.test(pom)) {
+      jvm = 17;
+      why += " (built with JDK 17 and --release)";
+    }
+  }
   const max = gradle ? gradleMaxJvm(gradle) : undefined;
   if (max && jvm > max) return { jvm: max, max, why: `${why}; capped at ${max} (newest Gradle ${gradle} runs on)` };
   return { jvm, max, why };

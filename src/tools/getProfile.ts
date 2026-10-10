@@ -106,7 +106,7 @@ export async function getProfile(services: Services, a: A) {
     ...(c.mavenPlugin ? [`  Maven plugin ${c.mavenPlugin}`] : []),
     ...(a.platform === "bukkit" ? [] : [`  how: ${nms.howTo.replace(/\{mc\}/g, a.mcVersion)}`]),
     `plugin.yml: ${p.pluginYml.files.join(" or ")}; api-version: '${c.apiVersion}'.`,
-    `Gradle ${c.gradle.version}+ wrapper${c.gradle.why ? ` (${c.gradle.why})` : ""}${c.gradle.jvm ? `, run on JDK ${c.gradle.jvm}+` : ""}${c.shadow ? `; shading: ${c.shadow}` : ""}.`,
+    ...(a.build === "maven" ? [] : [`Gradle ${c.gradle.version}+ wrapper${c.gradle.why ? ` (${c.gradle.why})` : ""}${c.gradle.jvm ? `, run on JDK ${c.gradle.jvm}+` : ""}${c.shadow ? `; shading: ${c.shadow}` : ""}.`]),
     ...p.notes.map((n) => `- ${n}`),
     ...(a.build ? ["", snippet(a.build, a.platform, a.mcVersion, c)] : []),
     ...(a.verbose ? [`rules: ${p.matchedRules.join("; ")}`, `refs: ${p.references.join(" ")}`] : []),
@@ -145,7 +145,7 @@ function snippet(build: "gradle" | "maven", platform: A["platform"], mc: string,
     `<repositories><repository><id>${platform === "paper" ? "papermc" : "spigotmc-repo"}</id><url>${c.apiRepo}</url></repository></repositories>`,
     `<dependencies>\n${deps.join("\n")}\n</dependencies>`,
   ];
-  if (platform === "paper" && p.nms.approach === "paperweight-userdev") out.push("<!-- NMS on Paper: paperweight-userdev is Gradle-only. With Maven compile against a Spigot remapped-mojang jar (platform=spigot) or switch to Gradle. -->");
+  if (platform === "paper" && p.nms.approach === "paperweight-userdev") out.push("<!-- NMS on Paper: paperweight-userdev is Gradle-only. With Maven: a Spigot remapped-mojang jar (platform=spigot), or the Paper server jar as a system-scope dependency (patch it with java -Dpaperclip.patchonly=true -jar paper.jar; Mojang-mapped from Fill server:mojang / 1.20.5+). -->");
   if (p.nms.approach === "spigot-remapped" && c.mavenPlugin && platform !== "bukkit") {
     const sv = c.mavenPlugin.split(":").pop();
     const v = `${mc}-R0.1-SNAPSHOT`;

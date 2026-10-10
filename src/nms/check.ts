@@ -157,7 +157,11 @@ export function checkRefs(index: McIndex, refs: NmsRef[], opts: CheckOptions = {
     const pick = (x: typeof c) => (r.kind === "field" ? x.f : x.m);
     const exact = chain.some((x) => pick(x).some(([n, ds]) => n === r.name && (!r.desc || ds === r.desc)));
     if (exact) continue;
-    const sameName = chain.flatMap((x) => pick(x).filter(([n]) => n === r.name).map(([n, ds]) => `${n}${fmtDesc(r.kind as "field" | "method", ds)}`));
+    // most-derived declaration only (overrides with covariant returns would repeat up the chain)
+    const named = chain.map((x) => pick(x).filter(([n]) => n === r.name)).find((l) => l.length) ?? [];
+    // hide compiler bridges (covariant returns) when real declarations exist
+    const real = named.filter(([, , acc]) => !(acc & 0x1000));
+    const sameName = (real.length ? real : named).map(([n, ds]) => `${n}${fmtDesc(r.kind as "field" | "method", ds)}`);
     if (sameName.length) {
       add(key, "error", `${r.kind} ${d(owner)}#${r.name}${fmtDesc(r.kind, r.desc ?? "")}: ${r.kind === "field" ? "type" : "signature"} changed, now ${[...new Set(sameName)].slice(0, 3).join(", ")}`, r.where);
       continue;

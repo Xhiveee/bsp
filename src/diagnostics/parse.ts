@@ -72,6 +72,7 @@ export function diagnose(text: string): Diagnosis {
   const server: NonNullable<Diagnosis["server"]> = {};
   let m: RegExpExecArray | null;
   if ((m = /This server is running (\w+) version (\S+) \(MC: ([\d.]+)\)/.exec(text))) Object.assign(server, { software: m[1], mc: m[3] });
+  else if ((m = /This server is running (\w+) version .*?\(Implementing API version ([\d.]+)-/.exec(text))) Object.assign(server, { software: m[1], mc: m[2] });
   else if ((m = /Starting minecraft server version ([\w.-]+)/.exec(text))) server.mc = m[1];
   if ((m = /Running Java (\d+)|Java version: (\d+)|java\.version[=:] ?"?(\d+)/.exec(text))) server.java = Number(m[1] ?? m[2] ?? m[3]);
   if ((m = /org\.bukkit\.craftbukkit\.(v\d+_\d+_R\d+)\.CraftServer/.exec(text))) server.nmsPackage = m[1];
@@ -196,6 +197,7 @@ export function diagnose(text: string): Diagnosis {
       continue;
     }
     if ((m = /UnknownDependencyException:\s*(?:Unknown\/missing dependency plugins: )?\[?([^\]]+)\]?\. Please download and install these plugins to run '([^']+)'/.exec(line))) {
+      if (!findings.some((f) => f.kind === "missing_dependency" && f.message.includes(m![1]!)))
       push(findings, { kind: "missing_dependency", severity: "error", plugin: m[2], message: `${m[2]} needs missing plugin(s): ${m[1]}.`, evidence: line, suggestion: `Install ${m[1]}, or make it softdepend.` });
       continue;
     }
@@ -243,6 +245,8 @@ export function diagnose(text: string): Diagnosis {
       const cls = m[2]!.replace(/\//g, ".");
       const pkg = NMS_PKG.exec(cls)?.[1];
       const internal = /^(net\.minecraft|org\.bukkit\.craftbukkit)\./.test(cls);
+      // NoClassDefFoundError + "Caused by: ClassNotFoundException" for the same class = one problem
+      if (findings.some((f) => /class_not_found|nms_mismatch/.test(f.kind) && f.message.includes(`: ${cls}`))) continue;
       push(findings, {
         kind: internal ? "nms_mismatch" : "class_not_found",
         severity: "error",
@@ -302,15 +306,18 @@ export function diagnose(text: string): Diagnosis {
   }
   if (!rootException) rootException = lines.map(strip).filter((l) => /^Caused by: /.test(l)).at(-1) ?? lines.map(strip).find((l) => /^[\w.$]+(?:Exception|Error)(?::|$)/.test(l));
 
-  const culprit = findCulprit(text, findings);
+  let culprit = findCulprit(text, findings);
   for (const f of findings) if (!f.plugin && culprit?.confidence === "high" && /nms|linkage|class_not_found|async/.test(f.kind)) f.plugin = culprit.plugin;
   const errors = findings.filter((f) => f.severity === "error");
+  // several plugins failing independently: no single culprit
+  const failing = [...new Set(errors.map((f) => f.plugin?.replace(/\.jar$/, "")).filter(Boolean))];
+  if (failing.length > 1) culprit = undefined;
   const summary =
     errors.length === 0
       ? findings.length
         ? `${findings.length} warning(s), no errors recognised.`
         : "No known error patterns recognised."
-      : `${errors.length} error(s): ${[...new Set(errors.map((f) => f.kind))].join(", ")}${culprit ? `; likely culprit: ${culprit.plugin}` : ""}.`;
+      : `${errors.length} error(s): ${[...new Set(errors.map((f) => f.kind))].join(", ")}${culprit ? `; likely culprit: ${culprit.plugin}` : failing.length > 1 ? `; plugins: ${failing.join(", ")}` : ""}.`;
   return { source, summary, findings, server: Object.keys(server).length ? server : undefined, culprit, rootException };
 }
 

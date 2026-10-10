@@ -78,8 +78,14 @@ async function validateModule(services: Services, info: ProjectInfo, a: A, rootD
   } catch {
     /* keep default */
   }
-  const devNs: MappingNs = a.mappings ?? info.devMappings ?? (facts.obfuscated === false ? "mojang" : "spigot");
   const useJar = a.serverJar ?? (a.targetVersion ? undefined : info.serverJar);
+  let devNs: MappingNs | undefined = a.mappings ?? info.devMappings;
+  // compiled against a server file: dev names are whatever that jar uses
+  const devJar = a.serverJar ?? info.serverJar;
+  if (!devNs && devJar) devNs = await services.indexes.open({ mcVersion: a.serverJar ? target : info.mcVersion, platform, serverJar: devJar }).then((o) => o.index.meta.namespace as MappingNs, () => undefined);
+  devNs ??= facts.obfuscated === false ? "mojang" : "spigot";
+  if (info.nms === "server-file" && devNs !== runtimeNs && refs.some((r) => r.origin !== "reflection"))
+    out.push(`warning: compiled against ${devNs} names, but ${platform} ${target} runs ${runtimeNs} names — remap the jar (SpecialSource/paperweight reobf) before shipping.`);
   const groups: [MappingNs, NmsRef[]][] = [];
   const dev = refs.filter((r) => r.origin !== "reflection" || devNs === runtimeNs);
   const rt = refs.filter((r) => r.origin === "reflection" && devNs !== runtimeNs);
