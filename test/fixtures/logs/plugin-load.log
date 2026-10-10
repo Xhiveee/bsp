@@ -1,0 +1,11 @@
+[10:00:00] [Server thread/INFO]: Starting minecraft server version 1.21.11
+[10:00:00] [Server thread/INFO]: This server is running Paper version 1.21.11-132-main@abc (2026-01-01T00:00:00Z) (Implementing API version 1.21.11-R0.1-SNAPSHOT)
+[10:00:01] [Server thread/ERROR]: [ModernPluginLoadingStrategy] Could not load plugin 'Old.jar' in folder 'plugins'
+org.bukkit.plugin.InvalidPluginException: Unsupported API version 1.22
+	at org.bukkit.craftbukkit.util.CraftMagicNumbers.checkSupported(CraftMagicNumbers.java:450) ~[paper-1.21.11.jar:1.21.11-132-abc]
+[10:00:01] [Server thread/ERROR]: Could not load 'plugins/Needy.jar' in folder 'plugins'
+org.bukkit.plugin.UnknownDependencyException: Unknown/missing dependency plugins: [Vault]. Please download and install these plugins to run 'Needy'.
+[10:00:02] [Server thread/ERROR]: Error occurred while enabling Gadget v2.0 (Is it up to date?)
+java.lang.NoSuchMethodError: 'void net.minecraft.server.level.ServerPlayer.setGlowing(boolean)'
+	at com.example.gadget.Gadget.onEnable(Gadget.java:30) ~[Gadget.jar:?]
+	at org.bukkit.plugin.java.JavaPlugin.setEnabled(JavaPlugin.java:288) ~[paper-api-1.21.11-R0.1-SNAPSHOT.jar:?]

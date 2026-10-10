@@ -1,0 +1,13 @@
+[12:00:01] [ServerMain/INFO]: Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, name=PROD]
+[12:00:02] [Server thread/INFO]: Starting minecraft server version 1.20.4
+[12:00:02] [Server thread/INFO]: This server is running Paper version git-Paper-499 (MC: 1.20.4) (Implementing API version 1.20.4-R0.1-SNAPSHOT) (Git: 9de3f75)
+[12:00:05] [Server thread/INFO]: [BspTest] Enabling BspTest v1.0
+[12:00:05] [Server thread/INFO]: Done (3.1s)! For help, type "help"
+[12:01:10] [Server thread/ERROR]: Could not pass event PlayerJoinEvent to BspTest v1.0
+java.lang.NoClassDefFoundError: net/minecraft/server/v1_16_R3/EntityPlayer
+	at dev.bsp.BspTest.onJoin(BspTest.java:15) ~[bsptest-1.0.jar:?]
+	at com.destroystokyo.paper.event.executor.MethodHandleEventExecutor.execute(MethodHandleEventExecutor.java:40) ~[paper-api-1.20.4-R0.1-SNAPSHOT.jar:?]
+	at co.aikar.timings.TimedEventExecutor.execute(TimedEventExecutor.java:80) ~[paper-api-1.20.4-R0.1-SNAPSHOT.jar:git-Paper-499]
+Caused by: java.lang.ClassNotFoundException: net.minecraft.server.v1_16_R3.EntityPlayer
+	at org.bukkit.plugin.java.PluginClassLoader.loadClass0(PluginClassLoader.java:197) ~[paper-api-1.20.4-R0.1-SNAPSHOT.jar:?]
+	... 3 more
