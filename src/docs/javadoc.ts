@@ -1,8 +1,15 @@
 /**
- * Javadoc search over the official search indexes (type-search-index.js / member-search-index.js) that every modern
- * javadoc site publishes: Paper (per version), Spigot and Bukkit (latest only), Adventure.
+ * Javadoc search over the official search indexes (type-search-index.js / member-search-index.js):
+ * Paper per version (jd.papermc.io), Spigot / Bukkit per version from the javadoc jars SpigotMC publishes on its
+ * Maven repository (extracted into the cache, results link to the local HTML), latest Spigot/Bukkit/Adventure online.
  */
+import AdmZip from "adm-zip";
+import { existsSync } from "node:fs";
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 import type { Services } from "../services.js";
+import { artifactBase, REPOS } from "../sources/endpoints.js";
+import { downloadFile } from "../util/download.js";
 import { Notes } from "../sources/index.js";
 import { compareMcVersions } from "../util/mcversion.js";
 
@@ -11,6 +18,8 @@ export interface JavadocSet {
   title: string;
   base: string;
   version: string;
+  /** base is a local folder (extracted javadoc jar). */
+  local?: boolean;
 }
 interface Entry {
   p: string;
@@ -40,11 +49,36 @@ function parseIndex(js: string | undefined): Entry[] | undefined {
   }
 }
 
+/** JDK 8 javadoc has no search index: read index-all.html (or index-files/*) instead. */
+export function parseIndexAll(html: string): { types: Entry[]; members: Entry[] } {
+  const types: Entry[] = [];
+  const members: Entry[] = [];
+  for (const m of html.matchAll(/<dt>[\s\S]*?<a href="(?:\.\.\/)?([^"#]+)\.html(?:#([^"]*))?"[^>]*>([\s\S]*?)<\/a>/g)) {
+    const file = m[1]!;
+    if (/(^|\/)(package-summary|package-tree|index-all)$/.test(file)) continue;
+    const slash = file.lastIndexOf("/");
+    const p = file.slice(0, slash).replace(/\//g, ".");
+    const c = file.slice(slash + 1);
+    const label = m[3]!.replace(/<[^>]+>/g, "").trim();
+    if (!p) continue;
+    if (m[2]) members.push({ p, c, l: label, u: m[2] });
+    else types.push({ p, l: c });
+  }
+  return { types, members };
+}
+
 const cache = new Map<string, Promise<{ types: Entry[]; members: Entry[] } | undefined>>();
-async function load(services: Services, base: string, notes: Notes) {
+async function load(services: Services, base: string, notes: Notes, local = false) {
   let p = cache.get(base);
   if (!p) {
     p = (async () => {
+      if (local) {
+        const rd = (f: string) => readFile(path.join(base, f), "utf8").catch(() => undefined);
+        const types = parseIndex(await rd("type-search-index.js"));
+        if (types) return { types, members: parseIndex(await rd("member-search-index.js")) ?? [] };
+        const all = await rd("index-all.html");
+        return all ? parseIndexAll(all) : undefined;
+      }
       const [t, m] = await Promise.all([services.versions.text(`${base}type-search-index.js`, notes, TTL).catch(() => undefined), services.versions.text(`${base}member-search-index.js`, notes, TTL).catch(() => undefined)]);
       const types = parseIndex(t);
       if (!types) return undefined;
@@ -68,6 +102,21 @@ async function paperSet(services: Services, mc: string | undefined, notes: Notes
   return undefined;
 }
 
+/** Spigot/Bukkit javadoc of one version, from SpigotMC's javadoc jar (downloaded once, extracted into the cache). */
+async function jarSet(services: Services, id: "spigot" | "bukkit", mc: string, notes: Notes): Promise<JavadocSet | undefined> {
+  const ga = id === "spigot" ? "org.spigotmc:spigot-api" : "org.bukkit:bukkit";
+  const v = `${mc}-R0.1-SNAPSHOT`;
+  const dir = path.join(services.config.cacheDir, "javadoc", `${id}-${mc}`);
+  const done = path.join(dir, ".bsp-extracted");
+  if (!existsSync(done)) {
+    const file = await services.versions.jarFileName(REPOS.spigot, ga, v, "javadoc", notes);
+    const jar = await downloadFile(`${artifactBase(REPOS.spigot, ga)}${v}/${file}`, path.join(services.config.cacheDir, "javadoc", file), { userAgent: services.config.userAgent, offline: services.config.offline });
+    new AdmZip(jar).extractAllTo(dir, true);
+    await writeFile(done, file);
+  }
+  return { id, title: `${id === "spigot" ? "Spigot" : "Bukkit"} javadoc (local jar)`, base: dir + path.sep, version: mc, local: true };
+}
+
 export async function javadocSets(services: Services, platform: string | undefined, mc: string | undefined, notes: Notes, msgs: string[]): Promise<JavadocSet[]> {
   const out: JavadocSet[] = [];
   if (!platform || platform === "paper") {
@@ -77,8 +126,8 @@ export async function javadocSets(services: Services, platform: string | undefin
   }
   if (platform === "spigot" || platform === "bukkit" || (!platform && !out.length)) {
     const id = platform === "bukkit" ? "bukkit" : "spigot";
-    out.push({ id, title: `${id === "spigot" ? "Spigot" : "Bukkit"} javadoc`, base: `https://hub.spigotmc.org/javadocs/${id}/`, version: "latest" });
-    if (mc) msgs.push(`${id === "spigot" ? "Spigot" : "Bukkit"} javadoc is published for the latest version only; check @since/@Deprecated against ${mc}.`);
+    const local = mc ? await jarSet(services, id, mc, notes).catch((e: Error) => (msgs.push(`${id} ${mc} javadoc jar unavailable (${e.message.split("\n")[0]}); using the latest online javadoc.`), undefined)) : undefined;
+    out.push(local ?? { id, title: `${id === "spigot" ? "Spigot" : "Bukkit"} javadoc`, base: `https://hub.spigotmc.org/javadocs/${id}/`, version: "latest" });
   }
   out.push({ id: "adventure", title: "Adventure javadoc", base: "https://jd.advntr.dev/api/latest/", version: "latest" });
   return out;
@@ -94,7 +143,7 @@ export async function searchJavadoc(services: Services, sets: JavadocSet[], quer
   const exact = q.replace(/\(.*$/, "").toLowerCase();
   const hits: JavadocHit[] = [];
   for (const set of sets) {
-    const idx = await load(services, set.base, notes);
+    const idx = await load(services, set.base, notes, set.local);
     if (!idx) {
       notes.warn(`${set.title} index unavailable (${set.base}).`);
       continue;
@@ -112,7 +161,8 @@ export async function searchJavadoc(services: Services, sets: JavadocSet[], quer
       if (!m) return 0;
       return (m / qw.length) * 6 - name.length / 200;
     };
-    const base = (p: string) => `${set.base}${p.replace(/\./g, "/")}/`;
+    const sep = set.local ? path.sep : "/";
+    const base = (p: string) => `${set.base}${p.split(".").join(sep)}${sep}`;
     for (const t of idx.types) {
       const s = score(t.l);
       if (s > 2) hits.push({ set, kind: "type", name: `${t.p}.${t.l}`, url: `${base(t.p)}${t.l}.html`, score: s + 0.5 });
@@ -123,5 +173,14 @@ export async function searchJavadoc(services: Services, sets: JavadocSet[], quer
       if (s > 2.5) hits.push({ set, kind: "member", name: `${m.p}.${m.c}#${m.l}`, url: `${base(m.p)}${m.c}.html#${encodeURI(m.u ?? m.l)}`, score: s });
     }
   }
-  return hits.sort((a, b) => b.score - a.score).slice(0, limit);
+  const top = hits.sort((a, b) => b.score - a.score).slice(0, limit);
+  // javadoc 8–10 anchors are name="m-int-java.lang.String-" instead of id="m(int,java.lang.String)"
+  for (const h of top) {
+    if (!h.set.local || !h.url.includes("#")) continue;
+    const [file, anchor] = h.url.split("#") as [string, string];
+    const html = await readFile(file, "utf8").catch(() => "");
+    const raw = decodeURI(anchor);
+    if (html && !html.includes(`"${raw}"`)) h.url = `${file}#${raw.replace(/[(),]/g, "-").replace(/\s+/g, "")}`;
+  }
+  return top;
 }

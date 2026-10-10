@@ -73,3 +73,13 @@ class Use {
     expect(r.failed).toEqual(["Bad.java"]);
   });
 });
+
+describe("javadoc index-all (JDK 8)", () => {
+  it("parses types and members", async () => {
+    const { parseIndexAll } = await import("../src/docs/javadoc.js");
+    const r = parseIndexAll(`<dl><dt><span class="memberNameLink"><a href="org/bukkit/entity/Player.html#getPing--">getPing()</a></span> - Method in interface org.bukkit.entity.<a href="org/bukkit/entity/Player.html">Player</a></dt>
+<dt><a href="org/bukkit/entity/Player.html" title="interface in org.bukkit.entity"><span class="typeNameLink">Player</span></a> - Interface in <a href="org/bukkit/entity/package-summary.html">org.bukkit.entity</a></dt></dl>`);
+    expect(r.members).toEqual([{ p: "org.bukkit.entity", c: "Player", l: "getPing()", u: "getPing--" }]);
+    expect(r.types).toEqual([{ p: "org.bukkit.entity", l: "Player" }]);
+  });
+});
