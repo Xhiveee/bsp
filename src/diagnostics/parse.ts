@@ -1,3 +1,5 @@
+import { compilerNames, describeCompiler, groupCompilerMessages, parseCompilerOutput, type CompilerGroup } from "./compiler.js";
+
 /**
  * Diagnosis of Bukkit/Spigot/Paper server logs, crash reports and build output (javac, Maven, Gradle).
  * Pure text → findings. Only message formats of the server/JVM/build tools are matched; they are stable across versions.
@@ -33,6 +35,8 @@ export interface Finding {
   file?: string;
   line?: number;
   plugin?: string;
+  /** Same error at further places (compiler errors), capped. */
+  also?: string[];
   /** The log line this came from. */
   evidence?: string;
   suggestion?: string;
@@ -78,34 +82,24 @@ export function diagnose(text: string): Diagnosis {
   if ((m = /org\.bukkit\.craftbukkit\.(v\d+_\d+_R\d+)\.CraftServer/.exec(text))) server.nmsPackage = m[1];
   /** plugin context of the current exception block (from the preceding error line) */
   let ctxPlugin: string | undefined;
+  const compiler = parseCompilerOutput(lines);
+  for (const g of groupCompilerMessages(compiler.messages)) {
+    findings.push({
+      kind: g.severity === "error" ? "compile_error" : "compile_warning",
+      severity: g.severity,
+      file: g.file,
+      line: g.line,
+      message: describeCompiler(g),
+      ...(g.also.length ? { also: g.also } : {}),
+      suggestion: g.severity === "error" ? compilerHint(g) : undefined,
+    });
+  }
+  const compileErrors = findings.some((f) => f.kind === "compile_error");
 
   for (let i = 0; i < lines.length; i++) {
+    if (compiler.consumed.has(i)) continue;
     const raw = lines[i]!;
     const line = strip(raw);
-
-    // ---- javac (Gradle style and Maven style) ----
-    if ((m = /^(?:\[(ERROR|WARNING)\] )?(.*?\.(?:java|kt)):(?:(\d+):(?:(\d+):)? (error|warning|e|w): |\[(\d+),(\d+)\] )(.+)$/.exec(line))) {
-      const sev = m[5] ? m[5].startsWith("e") : m[1] !== "WARNING";
-      const details: string[] = [];
-      for (let j = i + 1; j < Math.min(lines.length, i + 5); j++) {
-        const d = strip(lines[j]!).replace(/^\[ERROR\]\s*/, "");
-        if (/^(symbol|location|required|found|reason):/.test(d)) details.push(d.replace(/\s+/g, " "));
-        else if (/\.(java|kt):/.test(d)) break;
-      }
-      const msg = m[8]!;
-      push(findings, {
-        kind: sev ? "compile_error" : "compile_warning",
-        severity: sev ? "error" : "warning",
-        file: m[2],
-        line: Number(m[3] ?? m[6]),
-        message: msg + (details.length ? ` (${details.join("; ")})` : ""),
-        evidence: line,
-        suggestion: /cannot find symbol|does not exist|cannot access/.test(msg) && /net\.minecraft|craftbukkit|symbol/.test(msg + details.join(" "))
-          ? "Name differs in this version/mapping: search_server_source / translate_mapping; nms_validate for all refs."
-          : undefined,
-      });
-      continue;
-    }
 
     // ---- build tools / JVM ----
     if ((m = /Dependency requires at least JVM runtime version (\d+)\. This build uses a Java (\d+) JVM/.exec(line))) {
@@ -166,7 +160,9 @@ export function diagnose(text: string): Diagnosis {
     }
     if (/^\* What went wrong:/.test(line)) {
       const block: string[] = [];
-      for (let j = i + 1; j < lines.length && !/^\* (Try|Exception is):/.test(lines[j]!); j++) if (lines[j]!.trim()) block.push(lines[j]!.trim());
+      for (let j = i + 1; j < lines.length && !/^\* (Try|Exception is):/.test(lines[j]!); j++) if (lines[j]!.trim() && !compiler.consumed.has(j)) block.push(lines[j]!.trim());
+      // "Execution failed for task ':compileJava'. > Compilation failed…" adds nothing to the compiler errors
+      if (compileErrors && /compil/i.test(block.slice(0, 2).join(" "))) continue;
       push(findings, { kind: "build_failure", severity: "error", message: block.slice(0, 6).join(" ").slice(0, 600), evidence: block[0] });
       continue;
     }
@@ -350,4 +346,55 @@ export function findCulprit(text: string, findings: Finding[]): Diagnosis["culpr
   const best = [...score.values()].sort((a, b) => b.s - a.s)[0];
   if (!best) return undefined;
   return { plugin: best.name, confidence: best.s >= 8 ? "high" : best.s >= 4 ? "medium" : "low", reasons: best.reasons };
+}
+
+/** Spigot-mapped (CraftBukkit/Spigot NMS) → Mojang class names: code copied between the two breaks the build. */
+const SPIGOT_TO_MOJ: Record<string, string> = {
+  EntityPlayer: "ServerPlayer", EntityHuman: "Player", EntityLiving: "LivingEntity", EntityInsentient: "Mob", EntityArmorStand: "ArmorStand",
+  EntityTypes: "EntityType", WorldServer: "ServerLevel", NBTTagCompound: "CompoundTag", NBTTagList: "ListTag", BlockPosition: "BlockPos",
+  IChatBaseComponent: "Component", MinecraftKey: "ResourceLocation", PlayerConnection: "ServerGamePacketListenerImpl", NetworkManager: "Connection",
+  IBlockData: "BlockState", TileEntity: "BlockEntity", Vec3D: "Vec3", AxisAlignedBB: "AABB", EnumHand: "InteractionHand", EnumItemSlot: "EquipmentSlot",
+  IRegistry: "Registry", ChunkProviderServer: "ServerChunkCache", PacketPlayOutEntityDestroy: "ClientboundRemoveEntitiesPacket",
+  PacketPlayOutSpawnEntity: "ClientboundAddEntityPacket", PacketPlayOutEntityMetadata: "ClientboundSetEntityDataPacket", DataWatcher: "SynchedEntityData",
+  PacketDataSerializer: "FriendlyByteBuf", EnumDirection: "Direction", MathHelper: "Mth", ItemStack: "ItemStack",
+};
+const MOJ_TO_SPIGOT = Object.fromEntries(Object.entries(SPIGOT_TO_MOJ).filter(([s, m]) => s !== m).map(([s, m]) => [m, s]));
+const NMS_CTX = /net\.minecraft|org\.bukkit\.craftbukkit|com\.mojang/;
+const VERSIONED = /(?:org\.bukkit\.craftbukkit|net\.minecraft\.server)\.(v\d+_\d+_R\d+)/;
+
+/** Short next step for a compiler error that involves NMS/CraftBukkit names (mapping mismatch or version change). */
+export function compilerHint(g: CompilerGroup): string | undefined {
+  const n = compilerNames(g);
+  const simple = (x?: string) => x?.split(".").pop();
+  const name = n.name ?? simple(n.imported);
+  const all = [g.text, g.location, g.source, g.reason, g.symbol?.name, n.pkg].filter(Boolean).join(" ");
+  const ctx = NMS_CTX.test(all);
+  const ver = VERSIONED.exec(all)?.[1];
+  if (ver) return `Versioned package ${ver} does not match this server (Paper 1.20.5+ has no version package): nms_validate checks every NMS/CraftBukkit reference; search_server_source query=${simple(n.imported) ?? name ?? "<class>"} kind=class.`;
+  const cls = simple(n.imported) ?? name;
+  if (cls && SPIGOT_TO_MOJ[cls] && SPIGOT_TO_MOJ[cls] !== cls && (ctx || cls.length > 6)) return `${cls} is a Spigot-mapped name; Mojang mappings call it ${SPIGOT_TO_MOJ[cls]}. Check the project's mappings; translate_mapping name=${cls} from=spigot.`;
+  if (cls && MOJ_TO_SPIGOT[cls] && ctx) return `${cls} is a Mojang name; Spigot mappings call it ${MOJ_TO_SPIGOT[cls]}. Check the project's mappings; translate_mapping name=${cls} from=mojang.`;
+  if (name && /^[a-z]{1,2}$/.test(name) && ctx) return `${name} looks like an obfuscated name (changes every version): translate_mapping name=${n.owner ? `${n.owner}#` : ""}${name} from=obf; nms_validate for all NMS refs.`;
+  if (!ctx) {
+    if (/^(cannot_apply|no_suitable_method|not_abstract|bad_override)$/.test(g.code) && n.owner) return `If ${n.owner} is a server class, its API changed in this version: get_class className=${n.owner}${name ? ` method=${name}` : ""}.`;
+    return undefined;
+  }
+  switch (g.code) {
+    case "cannot_find_symbol":
+    case "unresolved_reference":
+      if (g.symbol && /^(method|variable|field)$/.test(g.symbol.kind) && n.owner) return `Renamed or removed in this version/mappings? get_class className=${n.owner} memberFilter=${name}; translate_mapping; nms_validate for all NMS refs.`;
+      return `Class moved/renamed in this version or mappings? search_server_source query=${cls ?? name} kind=class; translate_mapping; nms_validate.`;
+    case "package_missing":
+      return `Package moved in this version? search_server_source query=${simple(n.imported) ?? simple(n.pkg)} kind=class finds the current package.`;
+    case "cannot_apply":
+    case "no_suitable_method":
+    case "not_abstract":
+    case "bad_override":
+    case "incompatible_types":
+      return `Server API changed in this version: get_class${n.owner ? ` className=${n.owner}` : ""}${name ? ` method=${name}` : ""} shows the current signature.`;
+    case "cannot_access":
+      return /wrong version/.test(g.reason ?? "") ? "A dependency targets a newer Java: build with a newer JDK (get_profile)." : "A library class is missing from the compile classpath (dependency not declared or wrong version).";
+    default:
+      return undefined;
+  }
 }

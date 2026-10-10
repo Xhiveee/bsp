@@ -1,0 +1,74 @@
+> Task :compileJava FAILED
+/home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/MyPlugin.java:7: error: package org.bukkit.craftbukkit.v1_20_R3.entity does not exist
+import org.bukkit.craftbukkit.v1_20_R3.entity.CraftPlayer;
+                                             ^
+/home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/MyPlugin.java:8: error: cannot find symbol
+import net.minecraft.server.level.EntityPlayer;
+                                 ^
+  symbol:   class EntityPlayer
+  location: package net.minecraft.server.level
+/home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/MyPlugin.java:25: error: cannot find symbol
+        EntityPlayer handle = ((CraftPlayer) player).getHandle();
+        ^
+  symbol:   class EntityPlayer
+  location: class me.alex.myplugin.MyPlugin
+/home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/MyPlugin.java:31: error: cannot find symbol
+        int ping = handle.latency();
+                         ^
+  symbol:   method latency()
+  location: variable handle of type net.minecraft.server.level.ServerPlayer
+/home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/MyPlugin.java:40: error: method sendMessage in interface CommandSender cannot be applied to given types;
+        sender.sendMessage();
+              ^
+  required: String
+  found:    no arguments
+  reason: actual and formal argument lists differ in length
+/home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/listener/JoinListener.java:15: error: JoinListener is not abstract and does not override abstract method onEvent(Event) in EventExecutor
+public class JoinListener implements EventExecutor {
+       ^
+/home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/listener/JoinListener.java:22: error: unreported exception IOException; must be caught or declared to be thrown
+        Files.readString(path);
+                        ^
+7 errors
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler output below.
+  /home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/MyPlugin.java:7: error: package org.bukkit.craftbukkit.v1_20_R3.entity does not exist
+  import org.bukkit.craftbukkit.v1_20_R3.entity.CraftPlayer;
+                                               ^
+  /home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/MyPlugin.java:8: error: cannot find symbol
+  import net.minecraft.server.level.EntityPlayer;
+                                   ^
+    symbol:   class EntityPlayer
+    location: package net.minecraft.server.level
+  /home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/MyPlugin.java:25: error: cannot find symbol
+          EntityPlayer handle = ((CraftPlayer) player).getHandle();
+          ^
+    symbol:   class EntityPlayer
+    location: class me.alex.myplugin.MyPlugin
+  /home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/MyPlugin.java:31: error: cannot find symbol
+          int ping = handle.latency();
+                           ^
+    symbol:   method latency()
+    location: variable handle of type net.minecraft.server.level.ServerPlayer
+  /home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/MyPlugin.java:40: error: method sendMessage in interface CommandSender cannot be applied to given types;
+          sender.sendMessage();
+                ^
+    required: String
+    found:    no arguments
+    reason: actual and formal argument lists differ in length
+  /home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/listener/JoinListener.java:15: error: JoinListener is not abstract and does not override abstract method onEvent(Event) in EventExecutor
+  public class JoinListener implements EventExecutor {
+         ^
+  /home/alex/plugins/myplugin/src/main/java/me/alex/myplugin/listener/JoinListener.java:22: error: unreported exception IOException; must be caught or declared to be thrown
+          Files.readString(path);
+                          ^
+  7 errors
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+
+BUILD FAILED in 4s

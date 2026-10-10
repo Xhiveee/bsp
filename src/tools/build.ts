@@ -17,7 +17,8 @@ import { buildInput } from "./schemas.js";
 type A = z.infer<z.ZodObject<typeof buildInput>>;
 
 const KEEP = [
-  /\.(java|kt):(\d+:|\[\d+,\d+\])/,
+  /\.(java|kts?):(\d+:|\[\d+,\d+\])|^\s*[ew]: /,
+  /^\s*(symbol|location|required|found|reason|символ|расположение|требуется|найдено|причина)\s*:/,
   /^\* What went wrong:|^FAILURE:|^BUILD (FAILED|SUCCESSFUL|SUCCESS|FAILURE)/,
   /\[ERROR\]|Could not (resolve|find|GET|transfer)|status code \d{3}|could not be resolved/,
   /JVM runtime version|Unsupported class file|class file version|languageVersion=|Gradle requires JVM|release version|target release/,

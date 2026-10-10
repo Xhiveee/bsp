@@ -17,7 +17,7 @@ async function newest(dir: string, filter: (f: string) => boolean): Promise<stri
 
 export function findingLine(f: Finding): string {
   const loc = f.file ? ` ${f.file}${f.line ? `:${f.line}` : ""}` : "";
-  return `${f.severity} ${f.kind}${f.plugin ? ` [${f.plugin}]` : ""}${loc}: ${clip(f.message, 300)}${f.suggestion ? `\n  → ${f.suggestion}` : ""}${f.evidence && f.evidence !== f.message && !f.file ? `\n  log: ${clip(f.evidence, 200)}` : ""}`;
+  return `${f.severity} ${f.kind}${f.plugin ? ` [${f.plugin}]` : ""}${loc}: ${clip(f.message, 300)}${f.also?.length ? ` (also ${f.also.join(", ")})` : ""}${f.suggestion ? `\n  → ${f.suggestion}` : ""}${f.evidence && f.evidence !== f.message && !f.file ? `\n  log: ${clip(f.evidence, 200)}` : ""}`;
 }
 
 export async function analyzeCrash(_services: Services, a: A) {

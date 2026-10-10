@@ -1,0 +1,20 @@
+> Task :compileJava FAILED
+C:\Users\Алексей\plugins\myplugin\src\main\java\me\alex\myplugin\MyPlugin.java:8: ошибка: не удается найти символ
+import net.minecraft.server.level.EntityPlayer;
+                                 ^
+  символ:   класс EntityPlayer
+  расположение: пакет net.minecraft.server.level
+C:\Users\Алексей\plugins\myplugin\src\main\java\me\alex\myplugin\MyPlugin.java:31: ошибка: не удается найти символ
+        int ping = handle.latency();
+                         ^
+  символ:   метод latency()
+  расположение: переменная handle типа net.minecraft.server.level.ServerPlayer
+2 ошибки
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+
+BUILD FAILED in 3s

@@ -3,7 +3,7 @@ import type { Services } from "./services.js";
 import { registerTools } from "./tools/registry.js";
 
 export const SERVER_NAME = "bsp";
-export const SERVER_VERSION = "0.1.0";
+export const SERVER_VERSION = "0.1.1";
 
 const INSTRUCTIONS = `BSP: real Paper/Spigot server code (NMS, CraftBukkit, API), mappings, NMS checks, builds and docs for Bukkit/Spigot/Paper plugins (1.13+).
 - Don't guess versions or dependencies: list_versions, get_profile.
