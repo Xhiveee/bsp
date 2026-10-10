@@ -1,0 +1,104 @@
+# BSP version profile: Paper
+#
+# Versions, builds, downloads and required Java are read live from PaperMC's downloads service (Fill v3) and
+# Mojang's version JSON; artifact versions from repo.papermc.io maven-metadata. Rules say only what changed when.
+# Later rules override earlier ones; "since" = from that version on; when.obfuscated is read live (Spigot BuildData).
+platform: paper
+minVersion: "1.13"
+testedUpTo: "26.3"
+rules:
+  - since: "1.13"
+    description: Paper 1.13–1.16.5 — Spigot names, NMS/CraftBukkit in versioned packages (v1_X_RY)
+    set:
+      java: auto
+      api:
+        group: com.destroystokyo.paper
+        artifact: paper-api
+        versions: ["{mc}-R0.1-SNAPSHOT"]
+        repository: https://repo.papermc.io/repository/maven-public/
+        metadataUrl: https://repo.papermc.io/repository/maven-public/com/destroystokyo/paper/paper-api/maven-metadata.xml
+      nms:
+        approach: versioned-package
+        devMappings: spigot
+        runtimeMappings: spigot
+        reobf: false
+        craftBukkitRelocated: true
+        versionedNmsPackage: true
+        gradlePlugin: null
+        mavenPlugin: null
+        dependency: null
+        howTo: >-
+          No dev bundle. Compile against the patched Paper server jar as a compileOnly/provided file dependency:
+          download it (Fill), run `java -Dpaperclip.patchonly=true -jar paper-{mc}.jar` (patches only, does not start a server)
+          and use cache/patched_{mc}.jar. NMS imports are net.minecraft.server.v1_X_RY.* and break on every NMS revision.
+      pluginYml: { files: [plugin.yml], apiVersion: minor }
+      gradle:
+        version: "8.14.5"
+        shadow: { id: com.gradleup.shadow, version: latest, metadataUrl: "https://plugins.gradle.org/m2/com/gradleup/shadow/com.gradleup.shadow.gradle.plugin/maven-metadata.xml" }
+      maven: { compilerRelease: true }
+      references:
+        - https://docs.papermc.io/paper/dev/project-setup
+        - https://fill.papermc.io/v3/projects/paper
+      notes:
+        - Only paper-api 1.16.5 is still published for the 1.13–1.16 line; for older targets compile against spigot-api of that version (Paper is API-compatible) or the patched server jar.
+
+  - since: "1.17"
+    description: Paper 1.17+ — io.papermc.paper group, paperweight-userdev (Mojang names in dev, reobf to Spigot names)
+    set:
+      api:
+        group: io.papermc.paper
+        artifact: paper-api
+        versions: ["{mc}-R0.1-SNAPSHOT", "{mc}.build.*"]
+        metadataUrl: https://repo.papermc.io/repository/maven-public/io/papermc/paper/paper-api/maven-metadata.xml
+      nms:
+        approach: paperweight-userdev
+        devMappings: mojang
+        runtimeMappings: spigot
+        reobf: true
+        craftBukkitRelocated: true
+        versionedNmsPackage: false
+        gradlePlugin: { id: io.papermc.paperweight.userdev, version: latest, allowUnstable: true, metadataUrl: "https://plugins.gradle.org/m2/io/papermc/paperweight/userdev/io.papermc.paperweight.userdev.gradle.plugin/maven-metadata.xml" }
+        dependency:
+          group: io.papermc.paper
+          artifact: dev-bundle
+          versions: ["{mc}-R0.1-SNAPSHOT", "{mc}.build.*"]
+          repository: https://repo.papermc.io/repository/maven-public/
+          metadataUrl: https://repo.papermc.io/repository/maven-public/io/papermc/paper/dev-bundle/maven-metadata.xml
+        howTo: >-
+          Gradle only: plugins { id("io.papermc.paperweight.userdev") }, dependencies { paperweight.paperDevBundle("<dev bundle>") }
+          (replaces paper-api). Write NMS with Mojang names; the reobfJar task produces the Spigot-mapped jar to ship.
+          Reflection strings are NOT remapped.
+      references:
+        - https://docs.papermc.io/paper/dev/userdev
+        - https://github.com/PaperMC/paperweight-test-plugin
+      notes:
+        - Dev bundles exist from 1.17.1 (get_profile checks the live dev-bundle metadata).
+
+  - since: "1.19.3"
+    description: Paper plugins (paper-plugin.yml, experimental)
+    set:
+      pluginYml: { files: [plugin.yml, paper-plugin.yml] }
+      addNotes:
+        - paper-plugin.yml (Paper plugins) is experimental; plugin.yml works everywhere incl. Spigot.
+
+  - since: "1.20.5"
+    description: Mojang-mapped runtime, no CraftBukkit relocation, api-version with patch
+    set:
+      nms:
+        runtimeMappings: mojang
+        reobf: false
+        craftBukkitRelocated: false
+      pluginYml: { apiVersion: full }
+      addNotes:
+        - "Paper 1.20.5+ runs on Mojang names and remaps Spigot-mapped plugins on first load. Ship the Mojang-mapped jar: paperweight.reobfArtifactConfiguration = ReobfArtifactConfiguration.MOJANG_PRODUCTION (and add `paperweight-mappings-namespace: mojang` to the manifest if you build without userdev)."
+        - CraftBukkit is no longer relocated: use org.bukkit.craftbukkit.* without a version segment.
+
+  - when: { obfuscated: false }
+    description: Unobfuscated Minecraft (26.1+) — Mojang names everywhere, reobfuscation impossible
+    set:
+      nms:
+        runtimeMappings: mojang
+        reobf: false
+      gradle: { version: "9.2.1" }
+      addNotes:
+        - Paper no longer loads Spigot-mapped (obfuscated) plugins; reobfJar does not exist for these dev bundles.

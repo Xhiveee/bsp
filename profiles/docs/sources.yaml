@@ -1,0 +1,41 @@
+# BSP docs_search sources: official repositories whose Markdown is the source of an official site. BSP downloads them
+# (GitHub zip archive or git tree), caches them, splits pages into heading sections and maps files to their public URL
+# (front matter `slug:` → slugUrl, else the url template). Result URLs are checked before they are shown as verified.
+# Add or override sources in <BSP_PROFILES_DIR>/docs/*.yaml (same id replaces a built-in one).
+#
+# files[].match: regex on the repository path; $1..$9 = its groups in version/url. First matching rule wins.
+# version: "latest" or a version; versionFromContent: regex whose group 1 is the version (no match → next rule).
+# topics: tags for topic=… filtering (a topic also matches words in the page path, e.g. command-api, scheduler).
+# kind: docs | news. versioned: false = not tied to Minecraft versions.
+# Spigot's wiki/forum are behind Cloudflare and cannot be fetched; Spigot/Bukkit are covered by their javadoc index.
+sources:
+  - id: paper-docs
+    title: PaperMC documentation
+    platforms: [paper, spigot, bukkit]
+    versioned: false
+    zip: https://codeload.github.com/PaperMC/docs/zip/refs/heads/main
+    files:
+      - match: '^src/content/docs/(adventure)/(.+)\.mdx?$'
+        url: 'https://docs.papermc.io/$1/{page}'
+        slugUrl: 'https://docs.papermc.io/{slug}'
+        topics: [adventure]
+      - match: '^src/content/docs/(folia)/(.+)\.mdx?$'
+        url: 'https://docs.papermc.io/$1/{page}'
+        slugUrl: 'https://docs.papermc.io/{slug}'
+        topics: [folia]
+      - match: '^src/content/docs/(paper/dev)/(.+)\.mdx?$'
+        url: 'https://docs.papermc.io/$1/{page}'
+        slugUrl: 'https://docs.papermc.io/{slug}'
+
+  - id: paper-news
+    title: PaperMC news
+    platforms: [paper]
+    kind: news
+    githubTree: { repo: PaperMC/website, branch: main }
+    files:
+      - match: '^src/content/posts/(.+)\.mdx?$'
+        versionFromContent: '^title:\s*"?(?:Paper(?: & Velocity)? )?(\d+\.\d+(?:\.\d+)?)"?\s*$'
+        url: 'https://papermc.io/news/{page}'
+      - match: '^src/content/posts/(.+)\.mdx?$'
+        version: latest
+        url: 'https://papermc.io/news/{page}'

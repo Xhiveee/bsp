@@ -1,0 +1,48 @@
+{
+  "name": "bsp-mcp",
+  "version": "0.1.0",
+  "description": "BSP (BukkitSpigotPaper): an MCP server for developing Bukkit/Spigot/Paper plugins (1.13 → latest): real server classes (NMS, CraftBukkit, API), mappings, NMS checks, builds and docs, driven by live version data and declarative profiles.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Xhiveee/bsp.git"
+  },
+  "homepage": "https://github.com/Xhiveee/bsp#readme",
+  "bugs": {
+    "url": "https://github.com/Xhiveee/bsp/issues"
+  },
+  "bin": {
+    "bsp-mcp": "dist/index.js"
+  },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "profiles",
+    "docs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "adm-zip": "^0.6.1",
+    "fast-xml-parser": "^5.11.2",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

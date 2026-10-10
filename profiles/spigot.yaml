@@ -1,0 +1,93 @@
+# BSP version profile: Spigot (and the Bukkit API)
+#
+# Versions come from https://hub.spigotmc.org/versions/ (BuildTools), artifacts from Spigot's Nexus. The versioned
+# CraftBukkit package (v1_X_RY) and NMS relocations are read live from CraftBukkit's pom.xml at the BuildTools commit;
+# obfuscation from BuildData (class mappings present or not). Spigot server jars are only obtainable via BuildTools.
+platform: spigot
+minVersion: "1.13"
+testedUpTo: "26.3"
+rules:
+  - since: "1.13"
+    description: Spigot 1.13–1.16.5 — NMS in net.minecraft.server.v1_X_RY (Spigot names)
+    set:
+      java: auto
+      api:
+        group: org.spigotmc
+        artifact: spigot-api
+        versions: ["{mc}-R0.1-SNAPSHOT"]
+        repository: https://hub.spigotmc.org/nexus/content/repositories/snapshots/
+        metadataUrl: https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/maven-metadata.xml
+      nms:
+        approach: versioned-package
+        devMappings: spigot
+        runtimeMappings: spigot
+        reobf: false
+        craftBukkitRelocated: true
+        versionedNmsPackage: true
+        gradlePlugin: null
+        mavenPlugin: null
+        dependency:
+          group: org.spigotmc
+          artifact: spigot
+          versions: ["{mc}-R0.1-SNAPSHOT"]
+          repository: https://hub.spigotmc.org/nexus/content/repositories/snapshots/
+          metadataUrl: https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/maven-metadata.xml
+        howTo: >-
+          org.spigotmc:spigot is not on any public repository: run BuildTools (`java -jar BuildTools.jar --rev {mc}`), which
+          installs it into the local Maven repository (~/.m2). Use scope provided. NMS imports are version-specific.
+      pluginYml: { files: [plugin.yml], apiVersion: minor }
+      gradle:
+        version: "8.14.5"
+        shadow: { id: com.gradleup.shadow, version: latest, metadataUrl: "https://plugins.gradle.org/m2/com/gradleup/shadow/com.gradleup.shadow.gradle.plugin/maven-metadata.xml" }
+      maven: { compilerRelease: true }
+      references:
+        - https://www.spigotmc.org/wiki/buildtools/
+        - https://hub.spigotmc.org/versions/
+      notes: []
+
+  - since: "1.17"
+    description: Spigot 1.17+ — Mojang packages; develop against remapped-mojang, remap with SpecialSource
+    set:
+      nms:
+        approach: spigot-remapped
+        devMappings: mojang
+        runtimeMappings: spigot
+        reobf: true
+        versionedNmsPackage: false
+        mavenPlugin: { id: net.md-5:specialsource-maven-plugin, version: latest, metadataUrl: "https://repo1.maven.org/maven2/net/md-5/specialsource-maven-plugin/maven-metadata.xml" }
+        dependency:
+          group: org.spigotmc
+          artifact: spigot
+          versions: ["{mc}-R0.1-SNAPSHOT"]
+          classifier: remapped-mojang
+          repository: https://hub.spigotmc.org/nexus/content/repositories/snapshots/
+          metadataUrl: https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/maven-metadata.xml
+        howTo: >-
+          Run `java -jar BuildTools.jar --rev {mc} --remapped` (installs org.spigotmc:spigot:{mc}-R0.1-SNAPSHOT:remapped-mojang and
+          org.spigotmc:minecraft-server maps into ~/.m2). Compile against classifier remapped-mojang (scope provided) and add
+          specialsource-maven-plugin executions remap-obf (srgIn minecraft-server:txt:maps-mojang, reverse) and remap-spigot
+          (srgIn minecraft-server:csrg:maps-spigot). Reflection strings are NOT remapped.
+
+  - since: "1.20.5"
+    set:
+      pluginYml: { apiVersion: full }
+
+  - when: { obfuscated: false }
+    description: Unobfuscated Minecraft (26.1+) — Spigot uses Mojang names, no remapping
+    set:
+      nms:
+        approach: mojang-unobfuscated
+        devMappings: mojang
+        runtimeMappings: mojang
+        reobf: false
+        mavenPlugin: null
+        dependency:
+          group: org.spigotmc
+          artifact: spigot
+          versions: ["{mc}-R0.1-SNAPSHOT"]
+          repository: https://hub.spigotmc.org/nexus/content/repositories/snapshots/
+          metadataUrl: https://hub.spigotmc.org/nexus/content/repositories/snapshots/org/spigotmc/spigot-api/maven-metadata.xml
+        howTo: >-
+          Run `java -jar BuildTools.jar --rev {mc}` (installs org.spigotmc:spigot into ~/.m2); compile against it (provided).
+          Names are Mojang's at dev and runtime; no SpecialSource step.
+      gradle: { version: "9.2.1" }
