@@ -110,6 +110,14 @@ rules:
 
 Перезапускать сервер не нужно. Формат правил описан в [docs/reference.md](docs/reference.md#профили).
 
+## Шаблон AGENTS.md
+
+Готовые правила для агента: без JavaDoc и комментариев, плоская структура, проверка API через этот MCP, сборка, коммит и версия после каждой фичи. Скопируй [templates/AGENTS.md](templates/AGENTS.md) в корень своего проекта (для Claude Code назови `CLAUDE.md`):
+
+```
+curl -o AGENTS.md https://raw.githubusercontent.com/Xhiveee/bsp/main/templates/AGENTS.md
+```
+
 ## Подробнее
 
 - [docs/reference.md](docs/reference.md) — как работают инструменты, источники данных, профили.
