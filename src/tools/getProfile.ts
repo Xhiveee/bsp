@@ -127,6 +127,9 @@ function snippet(build: "gradle" | "maven", platform: A["platform"], mc: string,
       `repositories {\n    mavenCentral()\n    maven("${c.apiRepo}")\n}`,
       `dependencies {\n    ${userdev ? `paperweight.paperDevBundle("${c.nmsDep!.split(":")[2]}")` : `compileOnly("${g}:${art}:${ver}")`}${!userdev && c.nmsDep && platform !== "paper" ? `\n    compileOnly("${c.nmsDep}") // mavenLocal() after BuildTools` : ""}\n}`,
       `java.toolchain.languageVersion = JavaLanguageVersion.of(${p.java})`,
+      ...(userdev && c.gradle.jvm && Number(c.gradle.jvm) > Number(p.java)
+        ? [`paperweight.javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(${c.gradle.jvm}) } // paperweight ${pv} needs Java ${c.gradle.jvm}`]
+        : []),
       ...(userdev && p.nms.reobf ? ["tasks.assemble { dependsOn(tasks.reobfJar) } // ship build/libs/*.jar without -dev"] : []),
       ...(userdev && !p.nms.reobf && p.obfuscated ? ["paperweight.reobfArtifactConfiguration = io.papermc.paperweight.userdev.ReobfArtifactConfiguration.MOJANG_PRODUCTION"] : []),
     ].join("\n");

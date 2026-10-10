@@ -68,6 +68,7 @@ rules:
           Gradle only: plugins { id("io.papermc.paperweight.userdev") }, dependencies { paperweight.paperDevBundle("<dev bundle>") }
           (replaces paper-api). Write NMS with Mojang names; the reobfJar task produces the Spigot-mapped jar to ship.
           Reflection strings are NOT remapped.
+      notes: []
       references:
         - https://docs.papermc.io/paper/dev/userdev
         - https://github.com/PaperMC/paperweight-test-plugin
@@ -86,6 +87,10 @@ rules:
         runtimeMappings: mojang
         reobf: false
         craftBukkitRelocated: false
+        howTo: >-
+          Gradle only: plugins { id("io.papermc.paperweight.userdev") }, dependencies { paperweight.paperDevBundle("<dev bundle>") }
+          (replaces paper-api). Write NMS with Mojang names and ship the Mojang-mapped jar (MOJANG_PRODUCTION, no reobfJar);
+          Spigot servers need a Spigot-mapped build instead. Reflection strings are NOT remapped.
       pluginYml: { apiVersion: full }
       addNotes:
         - "Paper 1.20.5+ runs on Mojang names and remaps Spigot-mapped plugins on first load. Ship the Mojang-mapped jar: paperweight.reobfArtifactConfiguration = ReobfArtifactConfiguration.MOJANG_PRODUCTION (and add `paperweight-mappings-namespace: mojang` to the manifest if you build without userdev)."
@@ -97,6 +102,12 @@ rules:
       nms:
         runtimeMappings: mojang
         reobf: false
+        howTo: >-
+          Gradle only: plugins { id("io.papermc.paperweight.userdev") }, dependencies { paperweight.paperDevBundle("<dev bundle>") }
+          (replaces paper-api). Minecraft is unobfuscated: dev and runtime names are identical, the jar from `build` is what you ship.
+          Without userdev, compileOnly the server jar (Fill download) works as well.
       gradle: { version: "9.2.1" }
-      addNotes:
+      notes:
+        - paper-plugin.yml (Paper plugins) is experimental; plugin.yml works everywhere incl. Spigot.
+        - "CraftBukkit is not relocated: use org.bukkit.craftbukkit.* without a version segment."
         - Paper no longer loads Spigot-mapped (obfuscated) plugins; reobfJar does not exist for these dev bundles.
