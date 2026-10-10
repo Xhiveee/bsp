@@ -1,16 +1,20 @@
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 /** Download a binary once (atomic write; sha1/sha256-checked when known). Returns the path. */
-export async function downloadFile(url: string, dest: string, o: { userAgent: string; sha1?: string; sha256?: string; offline?: boolean }): Promise<string> {
+export async function downloadFile(url: string, dest: string, o: { userAgent: string; sha1?: string; sha256?: string; offline?: boolean; maxAgeMs?: number }): Promise<string> {
   const algo = o.sha256 ? "sha256" : o.sha1 ? "sha1" : undefined;
   const want = o.sha256 ?? o.sha1;
   if (existsSync(dest)) {
-    if (!algo) return dest;
-    const h = createHash(algo).update(await readFile(dest)).digest("hex");
-    if (h === want) return dest;
+    if (!algo && (!o.maxAgeMs || Date.now() - statSync(dest).mtimeMs < o.maxAgeMs || o.offline)) return dest;
+    if (!algo) {
+      /* stale: refetch below */
+    } else {
+      const h = createHash(algo).update(await readFile(dest)).digest("hex");
+      if (h === want) return dest;
+    }
   }
   if (o.offline) throw new Error(`Offline mode and ${path.basename(dest)} is not cached (${url}).`);
   let last: unknown;

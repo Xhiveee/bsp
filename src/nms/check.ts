@@ -54,9 +54,32 @@ export function indexPackages(index: McIndex): { cb?: string; nms?: string } {
 }
 
 export function checkRefs(index: McIndex, refs: NmsRef[], opts: CheckOptions = {}): CheckResult {
+  // alternatives (version branches): fine when one resolves cleanly, otherwise every variant is reported
+  const plain: NmsRef[] = [];
+  const groups = new Map<string, NmsRef[]>();
+  for (const r of refs) {
+    if (!r.alt) plain.push(r);
+    else groups.set(r.alt, [...(groups.get(r.alt) ?? []), r]);
+  }
+  let altOk = 0;
+  for (const g of groups.values()) {
+    if (g.some((r) => checkCore(index, [r], opts).problems.every((p) => p.severity !== "error"))) altOk++;
+    else plain.push(...g);
+  }
+  const res = checkCore(index, plain, opts);
+  res.checked += altOk;
+  return res;
+}
+
+function checkCore(index: McIndex, refs: NmsRef[], opts: CheckOptions): CheckResult {
   const pk = indexPackages(index);
   const problems = new Map<string, Problem>();
+  let soft = false;
   const add = (key: string, severity: Problem["severity"], text: string, where: string) => {
+    if (soft && severity === "error") {
+      severity = "warn";
+      text += " (name built by a reflection library at runtime — best-effort check)";
+    }
     const p = problems.get(key);
     if (p) {
       if (!p.where.includes(where)) p.where.push(where);
@@ -127,6 +150,7 @@ export function checkRefs(index: McIndex, refs: NmsRef[], opts: CheckOptions = {
   };
 
   for (const r0 of refs) {
+    soft = !!r0.soft;
     const owner = normalize(r0.owner, r0);
     if (!owner) continue;
     const r = { ...r0, owner, desc: r0.desc ? nd(r0.desc, r0) : undefined };

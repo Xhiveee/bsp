@@ -43,6 +43,8 @@ async function validateModule(services: Services, info: ProjectInfo, a: A, rootD
   const inc = new Set(a.include ?? ["bytecode", "source"]);
   const out: string[] = [];
   const refs: NmsRef[] = [];
+  const dynamic: string[] = [];
+  const unparsed: string[] = [];
   let bcFiles = 0;
   let srcFiles = 0;
   if (inc.has("bytecode")) {
@@ -54,6 +56,8 @@ async function validateModule(services: Services, info: ProjectInfo, a: A, rootD
       srcFiles = src.files;
       // with bytecode, sources only add what bytecode can't show: reflection by name, and imports when not compiled
       refs.push(...src.refs.filter((r) => r.origin === "reflection" || bc.files === 0));
+      dynamic.push(...src.dynamic);
+      unparsed.push(...src.unparsed);
       if (bc.files && src.newest > bc.newest) out.push("note: sources are newer than compiled classes — build first for exact member checks.");
     }
     if (!bc.files) out.push(`note: not compiled (${info.build === "maven" ? "target/classes" : "build/classes"} missing): only imports and reflection strings checked; run build for member-level checks.`);
@@ -61,13 +65,17 @@ async function validateModule(services: Services, info: ProjectInfo, a: A, rootD
     const src = await collectSource(info.javaSourceRoots, info.dir);
     srcFiles = src.files;
     refs.push(...src.refs);
+    dynamic.push(...src.dynamic);
+    unparsed.push(...src.unparsed);
   }
+  if (unparsed.length) out.push(`note: Java parser rejected ${unparsed.length} file(s) (regex fallback): ${unparsed.slice(0, 3).join(", ")}`);
   const target = a.targetVersion ?? info.mcVersion;
   const platform: Platform = a.targetPlatform ?? info.platform;
   const apiNote = apiVersionCheck(info, target);
   if (apiNote) out.push(apiNote);
   if (!refs.length) {
     out.push(`${label}: no NMS/CraftBukkit references (${bcFiles} class files, ${srcFiles} sources) — nothing version-specific to check.`);
+    if (dynamic.length) out.push(`info: ${dynamic.length} reflective name(s) built at runtime, not checkable statically: ${[...new Set(dynamic)].slice(0, 3).join("; ")}`);
     return { label, lines: out, problems: apiNote?.startsWith("error") ? 1 : 0 };
   }
   // Names: compiled/imported refs are in dev names; reflection strings are resolved at runtime → runtime names.
@@ -99,7 +107,7 @@ async function validateModule(services: Services, info: ProjectInfo, a: A, rootD
     let index: McIndex;
     let notes: string[];
     try {
-      ({ index, notes } = await services.indexes.open({ mcVersion: target, platform, mappings: ns, serverJar: useJar }));
+      ({ index, notes } = await services.indexes.open({ mcVersion: target, platform, mappings: ns, serverJar: useJar, buildtools: a.buildtools }));
     } catch (e) {
       out.push(`error: cannot load ${platform} ${target} (${ns} names): ${(e as Error).message}`);
       continue;
@@ -118,6 +126,7 @@ async function validateModule(services: Services, info: ProjectInfo, a: A, rootD
   for (const p of problems.slice(0, limit)) out.push(`${p.severity}: ${p.text} | ${p.where[0]}${p.where.length > 1 ? ` (+${p.where.length - 1})` : ""}`);
   if (problems.length > limit) out.push(`… ${problems.length - limit} more (limit=)`);
   out.push(`${checked} refs checked (${bcFiles} class files, ${srcFiles} sources)${unverifiable ? `, ${unverifiable} unverifiable (inherited from non-server types)` : ""}${skippedCb ? `, ${skippedCb} CraftBukkit refs unchecked (index has no CraftBukkit)` : ""}.`);
+  if (dynamic.length) out.push(`info: ${dynamic.length} reflective name(s) built at runtime, not checkable statically: ${[...new Set(dynamic)].slice(0, 3).join("; ")}${dynamic.length > 3 ? " …" : ""}`);
   if (devNs !== runtimeNs && !rt.length && refs.some((r) => r.origin === "reflection")) out.push("note: reflection strings are not remapped by reobf/SpecialSource — they must use runtime names.");
   return { label, lines: out, problems: problems.length + (apiNote?.startsWith("error") ? 1 : 0) };
 }

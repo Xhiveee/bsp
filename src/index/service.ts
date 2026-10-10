@@ -25,6 +25,7 @@ import { completeWithObf, emptySet, fillFieldDescs, MappingTable, parseProguard,
 import { indexJar, McIndex, vineflowerDecompile, vineflowerDecompileMany, type IndexMeta } from "./store.js";
 import { toolJar, toolJava } from "./tooljars.js";
 import { addSpigotAutoMembers } from "./automember.js";
+import { buildToolsOutputs, runBuildTools } from "./buildtools.js";
 
 export type IndexSource = "auto" | "paper" | "spigot" | "vanilla";
 
@@ -36,6 +37,8 @@ export interface IndexSpec {
   /** A server jar to index (BuildTools output, Paper jar, …). */
   serverJar?: string;
   projectDir?: string;
+  /** Spigot: run BuildTools when no local Spigot jar exists (opt-in; minutes). */
+  buildtools?: boolean;
 }
 
 export interface OpenedIndex {
@@ -125,14 +128,23 @@ export class IndexService {
       return { index, notes: [...notes, ...index.meta.notes], project };
     }
     if (source === "spigot" || (source === "auto" && platform !== "paper")) {
-      const local = this.localSpigotJar(mc, ns);
+      let local = this.localSpigotJar(mc, ns);
+      if (!local && spec.buildtools) {
+        // --remapped where Spigot plugins are written in Mojang names (1.17+ while obfuscated)
+        const spigotDev = await lookupProfile(this.services, "spigot", mc).then((l) => l.profile, () => undefined);
+        const remapped = !!spigotDev && spigotDev.nms.devMappings === "mojang" && spigotDev.obfuscated !== false;
+        await runBuildTools(this.services, mc, { remapped, onProgress });
+        local = this.localSpigotJar(mc, ns);
+        if (!local) throw new Error(`BuildTools finished but no spigot-${mc} jar with ${ns} names was found (~/.m2, ${path.join(this.services.config.cacheDir, "buildtools")}).`);
+        notes.push(`Spigot ${mc} built by BuildTools (cached; also installed into the local Maven repo).`);
+      }
       if (local) {
         const index = await this.openJar(local, mc, onProgress, "spigot");
         if (index.meta.namespace !== ns) notes.push(`Local BuildTools jar uses ${index.meta.namespace} names (asked: ${ns}).`);
         return { index, notes: [...notes, `Spigot ${mc} from local BuildTools output ${local}.`, ...index.meta.notes], project };
       }
-      if (source === "spigot") throw new Error(`No BuildTools output for Spigot ${mc} found (looked in ${path.join(this.services.config.mavenLocal, "org", "spigotmc", "spigot")} and BSP_BUILDTOOLS_DIRS). Run \`java -jar BuildTools.jar --rev ${mc}${ns === "mojang" ? " --remapped" : ""}\`, pass serverJar=, or use source=paper / vanilla.`);
-      if (platform === "spigot") notes.push(`No local Spigot (BuildTools) jar for ${mc}: using Mojang's server + spigot-api — CraftBukkit is not included (source=paper has Paper's CraftBukkit).`);
+      if (source === "spigot") throw new Error(`No BuildTools output for Spigot ${mc} found (looked in ${path.join(this.services.config.mavenLocal, "org", "spigotmc", "spigot")} and BSP_BUILDTOOLS_DIRS). Pass buildtools=true (BSP runs BuildTools: 5–15 min, cached), pass serverJar=, or use source=paper / vanilla.`);
+      if (platform === "spigot") notes.push(`No local Spigot (BuildTools) jar for ${mc}: using Mojang's server + spigot-api — no CraftBukkit (buildtools=true builds real Spigot; source=paper has Paper's).`);
     }
     if (source === "paper" || (source === "auto" && platform === "paper")) {
       try {
@@ -159,6 +171,9 @@ export class IndexService {
     const dir = path.join(this.services.config.mavenLocal, "org", "spigotmc", "spigot", v);
     const cands = ns === "mojang" ? [`spigot-${v}-remapped-mojang.jar`, `spigot-${v}.jar`] : [`spigot-${v}.jar`, `spigot-${v}-remapped-obf.jar`];
     for (const c of cands) if (existsSync(path.join(dir, c))) return path.join(dir, c);
+    const bt = buildToolsOutputs(path.join(this.services.config.cacheDir, "buildtools"), mc);
+    const hit = ns === "mojang" ? bt.find((f) => /remapped-mojang/.test(f)) : bt.find((f) => !/remapped/.test(path.basename(f)));
+    if (hit) return hit;
     for (const d of this.services.config.buildToolsDirs) {
       for (const c of [`spigot-${mc}.jar`, ...cands]) if (existsSync(path.join(d, c))) return path.join(d, c);
     }

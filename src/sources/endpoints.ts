@@ -37,6 +37,7 @@ export const ENDPOINTS = {
   snapshotMetadata: (repo: string, ga: string, v: string) => `${artifactBase(repo, ga)}${encodeURIComponent(v)}/maven-metadata.xml`,
   artifact: (repo: string, ga: string, v: string, file: string) => `${artifactBase(repo, ga)}${encodeURIComponent(v)}/${file}`,
   // tools
+  buildToolsJar: "https://hub.spigotmc.org/jenkins/job/BuildTools/lastSuccessfulBuild/artifact/target/BuildTools.jar",
   /** Gradle plugin marker POM (points at the implementation artifact). */
   gradlePluginMarker: (id: string, v: string) => `${REPOS.gradlePlugins}${id.replace(/\./g, "/")}/${id}.gradle.plugin/${v}/${id}.gradle.plugin-${v}.pom`,
   /** Gradle module metadata of an artifact on the plugin portal. */

@@ -10,7 +10,7 @@ import { allInterfaces, allSubtypes, directSubtypes, findUsages, overrides, pars
 import { searchInput, getClassInput, translateInput } from "./schemas.js";
 
 
-export const toSpec = (a: IndexSpec): IndexSpec => ({ mcVersion: a.mcVersion, platform: a.platform, mappings: a.mappings, source: a.source, serverJar: a.serverJar, projectDir: a.projectDir });
+export const toSpec = (a: IndexSpec): IndexSpec => ({ mcVersion: a.mcVersion, platform: a.platform, mappings: a.mappings, source: a.source, serverJar: a.serverJar, projectDir: a.projectDir, buildtools: a.buildtools });
 
 const dotted = (n: string) => n.replace(/\//g, ".");
 type Search = z.infer<z.ZodObject<typeof searchInput>>;

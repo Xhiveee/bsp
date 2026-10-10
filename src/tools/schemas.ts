@@ -15,6 +15,7 @@ export const indexSpecShape = {
   source: z.enum(["auto", "paper", "spigot", "vanilla"]).optional().describe("paper: Paper server jar (NMS+CraftBukkit+API). spigot: local BuildTools jar. vanilla: Mojang server + API jar, no CraftBukkit. auto: by platform."),
   serverJar: z.string().optional().describe("Index this server jar instead (BuildTools output, Paper jar)."),
   projectDir: z.string().optional().describe("Plugin project: version, platform, names from its build files."),
+  buildtools: z.boolean().optional().describe("Spigot: no local Spigot jar → run official BuildTools (5–15 min, cached)."),
 };
 
 export const listVersionsInput = {
@@ -66,6 +67,7 @@ export const nmsValidateInput = {
   targetPlatform: PlatformSchema.optional().describe("Server the plugin runs on (default: the project's)."),
   mappings: z.enum(NS).optional().describe("Names to check in (default: the project's dev names)."),
   serverJar: z.string().optional().describe("Check against this server jar."),
+  buildtools: indexSpecShape.buildtools,
   include: z.array(z.enum(["bytecode", "source"])).optional().describe("Default both (bytecode only if compiled)."),
   limit: z.number().int().min(1).max(500).optional().describe("Problems shown (default 40)."),
 };

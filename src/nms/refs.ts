@@ -23,6 +23,10 @@ export interface NmsRef {
   where: string;
   /** Reflective getDeclaredX: only members declared by the owner itself count. */
   declared?: boolean;
+  /** Alternatives (version branches): the group is fine when any member resolves. */
+  alt?: string;
+  /** Resolved by a third-party library at runtime (best-effort name): problems are warnings. */
+  soft?: boolean;
 }
 
 export const SERVER_INTERNAL = /^(net\/minecraft\/|org\/bukkit\/craftbukkit\/|com\/mojang\/math\/)/;
@@ -55,6 +59,9 @@ export function bytecodeRefs(buf: Buffer): NmsRef[] {
     } else if (c.tag === 8) {
       const s = r.utf8(c.index);
       if (DOTTED_INTERNAL.test(s) && /\.[A-Z]/.test(s)) out.push({ kind: "class", owner: s.replace(/\./g, "/"), origin: "reflection", where });
+      // invokedynamic string-concat recipe: "net.minecraft.server.\u0001.EntityPlayer" (version inserted at runtime)
+      const rm = /^(net\.minecraft\.server\.|org\.bukkit\.craftbukkit\.)\u0001\.([\w.$]+)$/.exec(s);
+      if (rm && /(^|\.)[A-Z]/.test(rm[2]!)) out.push({ kind: "class", owner: `${rm[1]!.replace(/\./g, "/")}{v}/${toInternal(rm[2]!)}`, origin: "reflection", where });
     }
   });
   // signatures of the plugin's own members (overrides / fields of NMS types)
@@ -151,18 +158,40 @@ export async function collectBytecode(classesDirs: string[]): Promise<{ refs: Nm
   return { refs, files, newest };
 }
 
-export async function collectSource(roots: string[], base: string): Promise<{ refs: NmsRef[]; files: number; newest: number }> {
+export async function collectSource(roots: string[], base: string): Promise<{ refs: NmsRef[]; files: number; newest: number; dynamic: string[]; unparsed: string[] }> {
   const refs: NmsRef[] = [];
-  let files = 0;
   let newest = 0;
   const { stat } = await import("node:fs/promises");
+  const files: { text: string; file: string }[] = [];
   for (const r of roots) {
     for (const f of await walk(r, ".java")) {
-      files++;
       newest = Math.max(newest, (await stat(f)).mtimeMs);
-      refs.push(...sourceRefs(await readFile(f, "utf8"), path.relative(base, f).replace(/\\/g, "/")));
+      files.push({ text: await readFile(f, "utf8"), file: path.relative(base, f).replace(/\\/g, "/") });
     }
   }
-  return { refs, files, newest };
+  const { analyzeReflection } = await import("./reflect.js");
+  const rf = analyzeReflection(files);
+  const failed = new Set(rf.failed);
+  for (const f of files) {
+    // imports always; regex reflection scan only where the Java parser gave up
+    refs.push(...sourceRefs(f.text, f.file).filter((x) => x.origin === "import" || failed.has(f.file)));
+  }
+  refs.push(...rf.refs);
+  groupAlternatives(refs);
+  return { refs, files: files.length, newest, dynamic: rf.dynamic, unparsed: rf.failed };
 }
 
+/** Version branches in one file (same class / member under different packages): alternatives of each other. */
+export function groupAlternatives(refs: NmsRef[]): void {
+  const groups = new Map<string, NmsRef[]>();
+  for (const r of refs) {
+    if (r.origin !== "reflection" || r.alt) continue;
+    const file = r.where.replace(/:\d+$/, "");
+    const simple = r.owner.slice(r.owner.lastIndexOf("/") + 1);
+    const key = `${file}|${r.kind}|${simple}|${r.name ?? ""}`;
+    const l = groups.get(key) ?? [];
+    l.push(r);
+    groups.set(key, l);
+  }
+  for (const [key, l] of groups) if (new Set(l.map((r) => r.owner)).size > 1) for (const r of l) r.alt = key;
+}
