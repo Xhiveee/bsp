@@ -175,12 +175,18 @@ export async function searchJavadoc(services: Services, sets: JavadocSet[], quer
   }
   const top = hits.sort((a, b) => b.score - a.score).slice(0, limit);
   // javadoc 8–10 anchors are name="m-int-java.lang.String-" instead of id="m(int,java.lang.String)"
+  // (local jars and older online javadoc alike); one page read per class, cached
+  const pages = new Map<string, Promise<string>>();
   for (const h of top) {
-    if (!h.set.local || !h.url.includes("#")) continue;
+    if (h.kind !== "member" || !h.url.includes("#")) continue;
     const [file, anchor] = h.url.split("#") as [string, string];
-    const html = await readFile(file, "utf8").catch(() => "");
     const raw = decodeURI(anchor);
-    if (html && !html.includes(`"${raw}"`)) h.url = `${file}#${raw.replace(/[(),]/g, "-").replace(/\s+/g, "")}`;
+    if (!/[(]/.test(raw)) continue;
+    let pg = pages.get(file);
+    if (!pg) pages.set(file, (pg = h.set.local ? readFile(file, "utf8").catch(() => "") : services.versions.text(file, notes, TTL).then((t) => t ?? "", () => "")));
+    const html = await pg;
+    const dash = raw.replace(/[(),]/g, "-").replace(/\s+/g, "");
+    if (html && !html.includes(`"${raw}"`) && html.includes(`"${dash}"`)) h.url = `${file}#${encodeURI(dash)}`;
   }
   return top;
 }

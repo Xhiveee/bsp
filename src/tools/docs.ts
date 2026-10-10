@@ -98,7 +98,14 @@ export async function docsSearch(services: Services, a: A, injected?: DocsStore)
   if (!docHits.length && !jdHits.length) return fail(`No matches for "${a.query}"${topic ? ` (topic ${topic})` : ""}. Searched: ${used.join("; ") || "nothing"}.${warnings.length ? ` ${warnings.join(" ")}` : ""}`);
   out.push(`"${a.query}"${platform ? ` ${platform}` : ""}${mc ? ` ${mc}` : ""}${topic ? ` [${topic}]` : ""} — searched: ${used.join("; ")}.`);
   out.push(...msgs.map((m) => `note: ${m}`), ...warnings.map((w) => `warning: ${w}`));
-  if (docHits.length) out.push(...docHits);
-  if (jdHits.length) out.push("javadoc:", ...jdHits);
+  // API identifiers (Player#getPing, getPing, ItemMeta): javadoc first, prose trimmed to 2
+  const apiQuery = /#|^[A-Za-z_$][\w$]*(\.[\w$]+)*(\(.*\))?$/.test(a.query.trim()) && /[A-Z#(]|[a-z][A-Z]/.test(a.query);
+  if (apiQuery && jdHits.length) {
+    out.push("javadoc:", ...jdHits);
+    if (docHits.length) out.push("docs:", ...docHits.slice(0, 2));
+  } else {
+    if (docHits.length) out.push(...docHits);
+    if (jdHits.length) out.push("javadoc:", ...jdHits);
+  }
   return okText(out.join("\n"));
 }
