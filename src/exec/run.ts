@@ -56,6 +56,12 @@ export function winCmdLine(command: string, args: string[]): string {
   return [command, ...args].map(q).join(" ");
 }
 
+/** How a command is spawned: Windows .bat/.cmd (mvnw.cmd, gradlew.bat) must go through cmd.exe, quoted by us. */
+export function spawnPlan(command: string, args: string[], platform: NodeJS.Platform = process.platform, comSpec = process.env.ComSpec): { file: string; args: string[]; verbatim: boolean } {
+  if (platform === "win32" && /\.(bat|cmd)$/i.test(command)) return { file: comSpec ?? "cmd.exe", args: ["/d", "/s", "/c", `"${winCmdLine(command, args)}"`], verbatim: true };
+  return { file: command, args, verbatim: false };
+}
+
 export async function runProcess(o: RunOptions): Promise<RunResult> {
   await mkdir(path.dirname(o.logFile), { recursive: true });
   const log = createWriteStream(o.logFile);
@@ -68,11 +74,8 @@ export async function runProcess(o: RunOptions): Promise<RunResult> {
   let timedOut = false;
   const start = Date.now();
 
-  // Windows .bat/.cmd (gradlew.bat) must go through cmd.exe; quote ourselves so paths with spaces survive.
-  const bat = process.platform === "win32" && /\.(bat|cmd)$/i.test(o.command);
-  const child = bat
-    ? spawn(process.env.ComSpec ?? "cmd.exe", ["/d", "/s", "/c", `"${winCmdLine(o.command, o.args)}"`], { cwd: o.cwd, env: o.env ?? process.env, stdio: ["ignore", "pipe", "pipe"], windowsVerbatimArguments: true, windowsHide: true })
-    : spawn(o.command, o.args, { cwd: o.cwd, env: o.env ?? process.env, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+  const plan = spawnPlan(o.command, o.args);
+  const child = spawn(plan.file, plan.args, { cwd: o.cwd, env: o.env ?? process.env, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"], windowsVerbatimArguments: plan.verbatim, windowsHide: true });
 
   const stop = (why: "timeout" | "matcher") => {
     if (why === "timeout") timedOut = true;

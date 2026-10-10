@@ -73,15 +73,22 @@ async function requiredJvm(services: Services, info: ProjectInfo, gradle?: strin
   return { jvm, max, why };
 }
 
+/** Where Maven may be, in order: project wrapper, then mvn on PATH (Windows: mvnw.cmd / mvn.cmd, ';'-separated PATH). */
+export function mavenCandidates(root: string, pathEnv: string, platform: NodeJS.Platform = process.platform): string[] {
+  const P = platform === "win32" ? path.win32 : path.posix;
+  const win = platform === "win32";
+  return [P.join(root, win ? "mvnw.cmd" : "mvnw"), ...pathEnv.split(P.delimiter).filter(Boolean).map((d) => P.join(d.replace(/^"(.*)"$/, "$1"), win ? "mvn.cmd" : "mvn"))];
+}
+
+export function gradleWrapper(root: string, platform: NodeJS.Platform = process.platform): string {
+  return platform === "win32" ? path.win32.join(root, "gradlew.bat") : path.posix.join(root, "gradlew");
+}
+
 /** mvnw, mvn on PATH, or Apache Maven downloaded from Maven Central into the cache. */
 async function mavenCommand(services: Services, root: string): Promise<{ cmd: string; note?: string }> {
   const win = process.platform === "win32";
-  const wrapper = path.join(root, win ? "mvnw.cmd" : "mvnw");
-  if (existsSync(wrapper)) return { cmd: wrapper };
-  for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
-    const c = path.join(dir, win ? "mvn.cmd" : "mvn");
-    if (dir && existsSync(c)) return { cmd: c };
-  }
+  const found = mavenCandidates(root, process.env.PATH ?? "").find((c) => existsSync(c));
+  if (found) return { cmd: found };
   const v = await services.versions.latestMaven(ENDPOINTS.mavenDistMetadata, { prefix: "3." });
   if (!v) throw new Error("No Maven found (mvnw/mvn) and its version list could not be read.");
   const home = path.join(services.config.cacheDir, "tools", `apache-maven-${v}`);
@@ -107,7 +114,7 @@ export async function build(services: Services, a: A) {
   let args: string[];
   let gradleVersion: string | undefined;
   if (info.build === "gradle") {
-    cmd = path.join(root, process.platform === "win32" ? "gradlew.bat" : "gradlew");
+    cmd = gradleWrapper(root);
     if (!existsSync(cmd)) return fail(`No Gradle wrapper in ${root}. Add one (gradle wrapper --gradle-version <get_profile's Gradle>) and retry.`);
     gradleVersion = await wrapperGradleVersion(root);
     const sub = info.dir !== root ? `:${path.relative(root, info.dir).split(path.sep).join(":")}` : "";

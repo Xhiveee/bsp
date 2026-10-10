@@ -1,4 +1,5 @@
 import path from "node:path";
+import { javaBin } from "./buildtools.js";
 import { discoverJdks, type JdkInfo } from "../jdk/discover.js";
 import type { Services } from "../services.js";
 import { ENDPOINTS } from "../sources/endpoints.js";
@@ -27,5 +28,5 @@ export async function toolJava(min = 17): Promise<string> {
   cachedJdks ??= await discoverJdks();
   const jdk = cachedJdks.filter((j) => j.isJdk && j.major >= min).sort((a, b) => b.major - a.major)[0];
   if (!jdk) throw new Error(`Building the source index needs a JDK ${min}+ (none found). Install Temurin (https://adoptium.net) or set BSP_JDKS.`);
-  return path.join(jdk.home, "bin", process.platform === "win32" ? "java.exe" : "java");
+  return javaBin(jdk.home);
 }

@@ -17,12 +17,19 @@ import { downloadFile } from "../util/download.js";
 const WEEK = 7 * 24 * 3600_000;
 
 /** Folder names BuildTools (and the Java/Maven/git chain it drives) is known to choke on. */
-export function buildToolsPathProblem(dir: string): string | undefined {
+export function buildToolsPathProblem(dir: string, platform: NodeJS.Platform = process.platform): string | undefined {
   if (/!/.test(dir)) return `"!" in ${dir} breaks Java jar URLs`;
   if (/\s/.test(dir)) return `spaces in ${dir} break BuildTools' git/Maven steps`;
   // eslint-disable-next-line no-control-regex
   if (/[^\x00-\x7f]/.test(dir)) return `non-ASCII characters in ${dir} break BuildTools on Windows`;
+  // the Spigot work tree adds ~150 characters; Windows git/Java fail past MAX_PATH (260) unless long paths are enabled
+  if (platform === "win32" && dir.length > 100) return `${dir} is too long for BuildTools' work tree under Windows MAX_PATH`;
   return undefined;
+}
+
+/** java launcher inside a JDK home. */
+export function javaBin(home: string, platform: NodeJS.Platform = process.platform): string {
+  return platform === "win32" ? path.win32.join(home, "bin", "java.exe") : path.posix.join(home, "bin", "java");
 }
 
 /** JDK for BuildTools: within Spigot's declared class-file range [min,max] (major = class version − 44), newest first. */
@@ -81,7 +88,7 @@ async function doRun(services: Services, mc: string, opts: { remapped: boolean; 
   await mkdir(work, { recursive: true });
   const logFile = path.join(root, "logs", `${mc}${opts.remapped ? "-remapped" : ""}.log`);
   opts.onProgress?.(`Running BuildTools ${mc} on JDK ${jdk.major} (5–15 min; log ${logFile})…`);
-  const java = path.join(jdk.home, "bin", process.platform === "win32" ? "java.exe" : "java");
+  const java = javaBin(jdk.home);
   const r = await runProcess({
     command: java,
     args: ["-Xmx2G", ...buildToolsArgs(jar, mc, path.join(root, "out", mc), opts.remapped)],
