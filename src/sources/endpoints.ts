@@ -37,6 +37,10 @@ export const ENDPOINTS = {
   snapshotMetadata: (repo: string, ga: string, v: string) => `${artifactBase(repo, ga)}${encodeURIComponent(v)}/maven-metadata.xml`,
   artifact: (repo: string, ga: string, v: string, file: string) => `${artifactBase(repo, ga)}${encodeURIComponent(v)}/${file}`,
   // tools
+  /** Gradle plugin marker POM (points at the implementation artifact). */
+  gradlePluginMarker: (id: string, v: string) => `${REPOS.gradlePlugins}${id.replace(/\./g, "/")}/${id}.gradle.plugin/${v}/${id}.gradle.plugin-${v}.pom`,
+  /** Gradle module metadata of an artifact on the plugin portal. */
+  gradleModule: (g: string, a: string, v: string) => `${REPOS.gradlePlugins}${g.replace(/\./g, "/")}/${a}/${v}/${a}-${v}.module`,
   mavenDistMetadata: meta(REPOS.central, "org.apache.maven:apache-maven"),
   mavenDist: (v: string) => `${artifactBase(REPOS.central, "org.apache.maven:apache-maven")}${v}/apache-maven-${v}-bin.zip`,
   tinyRemapperMetadata: "https://maven.fabricmc.net/net/fabricmc/tiny-remapper/maven-metadata.xml",

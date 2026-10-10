@@ -133,6 +133,14 @@ export function diagnose(text: string): Diagnosis {
       push(findings, { kind: "jvm_mismatch", severity: "error", message: m[1] ? `Gradle needs Java ${m[1]}+.` : `Java ${m[2]} cannot run Gradle ${m[3]}.`, evidence: line });
       continue;
     }
+    if ((m = /No matching variant of ([\w.-]+:[\w.-]+:[\w.+-]+) was found/.exec(line))) {
+      const near = lines.slice(i, i + 25).join("\n");
+      const g = /'org\.gradle\.plugin\.api-version' with value '([\d.]+)' and the consumer needed .*?'([\d.]+)'/.exec(near);
+      if (g) {
+        push(findings, { kind: "build_failure", severity: "error", message: `${m[1]} needs Gradle ${g[1]}+, the wrapper is ${g[2]}.`, evidence: line, suggestion: `Update the wrapper: ./gradlew wrapper --gradle-version ${g[1]} (or edit gradle/wrapper/gradle-wrapper.properties), or use an older plugin version.` });
+        continue;
+      }
+    }
     if ((m = /Could not (?:resolve|find)(?: artifact)? ((?:[\w.-]+:){2,4}[\w.+-]+)/.exec(line)) || (m = /following artifacts could not be resolved: ([^,]+?)(?: \(absent\))?[,:]/.exec(line))) {
       const near = lines.slice(i, i + 8).join("\n");
       const status = /status code (\d{3})|status: (\d{3})/.exec(near);
@@ -278,6 +286,11 @@ export function diagnose(text: string): Diagnosis {
     }
   }
 
+  // a specific "plugin needs Gradle X" explains the generic resolution failures of the same artifact
+  for (const f of findings.filter((x) => / needs Gradle /.test(x.message))) {
+    const ga = f.message.split(" ")[0]!.split(":").slice(0, 2).join(":");
+    for (let k = findings.length - 1; k >= 0; k--) if (findings[k] !== f && findings[k]!.message.includes(ga)) findings.splice(k, 1);
+  }
   let rootException: string | undefined;
   if (source === "crash-report") {
     const di = lines.findIndex((l) => l.startsWith("Description:"));

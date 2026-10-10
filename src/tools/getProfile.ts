@@ -5,6 +5,7 @@ import { matchVersion } from "../index/service.js";
 import type { ResolvedProfile } from "../profiles/schema.js";
 import { lookupProfile, type Services } from "../services.js";
 import { Notes } from "../sources/index.js";
+import { compareLooseVersions } from "../util/mcversion.js";
 import { okText } from "./result.js";
 import { getProfileInput } from "./schemas.js";
 
@@ -22,6 +23,8 @@ export interface ConcreteProfile {
   shadow?: string;
   craftBukkitPackage?: string;
   apiVersion: string;
+  /** Minimum Gradle / Gradle JVM: the profile's, raised to what the Gradle plugins' metadata requires. */
+  gradle: { version: string; jvm?: number; why?: string };
   notes: Notes;
 }
 
@@ -62,15 +65,26 @@ export async function concreteProfile(services: Services, platform: A["platform"
     cbPkg = cb ? (cb.packageVersion ? `org.bukkit.craftbukkit.v${cb.packageVersion}` : "org.bukkit.craftbukkit") : undefined;
   } else cbPkg = "org.bukkit.craftbukkit";
   const minor = mc.split(".").slice(0, 2).join(".");
+  const gradlePlugin = platform === "bukkit" ? undefined : await plugin(profile.nms.gradlePlugin);
+  const shadow = await plugin(profile.gradle.shadow);
+  const gradle: ConcreteProfile["gradle"] = { version: profile.gradle.version };
+  for (const ref of [gradlePlugin, shadow]) {
+    if (!ref) continue;
+    const i = ref.lastIndexOf(":");
+    const needs = await v.gradlePluginNeeds(ref.slice(0, i), ref.slice(i + 1), notes).catch(() => undefined);
+    if (needs?.gradle && compareLooseVersions(needs.gradle, gradle.version) > 0) Object.assign(gradle, { version: needs.gradle, why: `${ref} needs it` });
+    if (needs?.jvm && needs.jvm > (gradle.jvm ?? 0)) gradle.jvm = needs.jvm;
+  }
   return {
     profile,
     api,
     apiRepo: profile.api.repository,
     nmsDep,
     nmsDepLocal,
-    gradlePlugin: platform === "bukkit" ? undefined : await plugin(profile.nms.gradlePlugin),
+    gradlePlugin,
     mavenPlugin: platform === "bukkit" ? undefined : await plugin(profile.nms.mavenPlugin),
-    shadow: await plugin(profile.gradle.shadow),
+    shadow,
+    gradle,
     craftBukkitPackage: cbPkg,
     apiVersion: profile.pluginYml.apiVersion === "full" ? mc : minor,
     notes,
@@ -92,7 +106,7 @@ export async function getProfile(services: Services, a: A) {
     ...(c.mavenPlugin ? [`  Maven plugin ${c.mavenPlugin}`] : []),
     ...(a.platform === "bukkit" ? [] : [`  how: ${nms.howTo.replace(/\{mc\}/g, a.mcVersion)}`]),
     `plugin.yml: ${p.pluginYml.files.join(" or ")}; api-version: '${c.apiVersion}'.`,
-    `Gradle ${p.gradle.version}+ (wrapper)${c.shadow ? `; shading: ${c.shadow}` : ""}.`,
+    `Gradle ${c.gradle.version}+ wrapper${c.gradle.why ? ` (${c.gradle.why})` : ""}${c.gradle.jvm ? `, run on JDK ${c.gradle.jvm}+` : ""}${c.shadow ? `; shading: ${c.shadow}` : ""}.`,
     ...p.notes.map((n) => `- ${n}`),
     ...(a.build ? ["", snippet(a.build, a.platform, a.mcVersion, c)] : []),
     ...(a.verbose ? [`rules: ${p.matchedRules.join("; ")}`, `refs: ${p.references.join(" ")}`] : []),

@@ -135,6 +135,27 @@ export class VersionService {
       .sort((a, b) => compareLooseVersions(b, a))[0];
   }
 
+  /**
+   * What a Gradle plugin version needs, from its published Gradle module metadata: the minimum Gradle
+   * (org.gradle.plugin.api-version) and the minimum JVM Gradle must run on (org.gradle.jvm.version).
+   */
+  async gradlePluginNeeds(id: string, version: string, notes?: Notes): Promise<{ gradle?: string; jvm?: number } | undefined> {
+    const pom = await this.opt(ENDPOINTS.gradlePluginMarker(id, version), notes, IMMUTABLE);
+    const dep = pom && /<dependency>\s*<groupId>([^<]+)<\/groupId>\s*<artifactId>([^<]+)<\/artifactId>\s*<version>([^<]+)<\/version>/.exec(pom);
+    if (!dep) return undefined;
+    const mod = await this.opt(ENDPOINTS.gradleModule(dep[1]!, dep[2]!, dep[3]!), notes, IMMUTABLE);
+    if (!mod) return undefined;
+    try {
+      const j = JSON.parse(mod) as { variants?: { attributes?: Record<string, unknown> }[] };
+      const libs = (j.variants ?? []).map((v) => v.attributes ?? {}).filter((a) => a["org.gradle.category"] === "library");
+      const gradle = libs.map((a) => a["org.gradle.plugin.api-version"]).filter((x): x is string => typeof x === "string").sort(compareLooseVersions)[0];
+      const jvm = libs.map((a) => a["org.gradle.jvm.version"]).filter((x): x is number => typeof x === "number").sort((a, b) => a - b)[0];
+      return { gradle, jvm };
+    } catch {
+      return undefined;
+    }
+  }
+
   /** File name of the main jar of a -SNAPSHOT version (timestamped), or the plain name for releases. */
   async jarFileName(repo: string, ga: string, version: string, classifier?: string, notes?: Notes): Promise<string> {
     const artifact = ga.split(":")[1]!;

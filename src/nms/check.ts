@@ -1,4 +1,5 @@
 /** Check collected NMS/CraftBukkit references against a server index. */
+import { descToJava } from "../index/classfile.js";
 import type { McIndex } from "../index/store.js";
 import { type NmsRef, VERSION_SEG } from "./refs.js";
 
@@ -90,6 +91,7 @@ export function checkRefs(index: McIndex, refs: NmsRef[], opts: CheckOptions = {
           ? `org.bukkit.craftbukkit.${seg}: this server has no versioned CraftBukkit package${sev === "warn" ? " (Paper rewrites compiled refs at load for now — PaperMC announced removing this)" : "; reflection strings are not rewritten"}`
           : `org.bukkit.craftbukkit.${seg}: server has ${pk.cb} → NoClassDefFoundError/ClassNotFoundException (versioned package)`, r.where);
       }
+      if (!seg && pk.cb) add(`pkg none`, "error", `org.bukkit.craftbukkit.${d(rest)}: CraftBukkit is org.bukkit.craftbukkit.${pk.cb}.* on this version (unversioned only from Paper 1.20.5)`, r.where);
       return pk.cb ? `org/bukkit/craftbukkit/${pk.cb}/${rest}` : `org/bukkit/craftbukkit/${rest}`;
     }
     if (m && m[1] === "net/minecraft/server") {
@@ -155,9 +157,9 @@ export function checkRefs(index: McIndex, refs: NmsRef[], opts: CheckOptions = {
     const pick = (x: typeof c) => (r.kind === "field" ? x.f : x.m);
     const exact = chain.some((x) => pick(x).some(([n, ds]) => n === r.name && (!r.desc || ds === r.desc)));
     if (exact) continue;
-    const sameName = chain.flatMap((x) => pick(x).filter(([n]) => n === r.name).map(([n, ds]) => `${n}${r.kind === "field" ? `:${ds}` : ds}`));
+    const sameName = chain.flatMap((x) => pick(x).filter(([n]) => n === r.name).map(([n, ds]) => `${n}${fmtDesc(r.kind as "field" | "method", ds)}`));
     if (sameName.length) {
-      add(key, "error", `${r.kind} ${d(owner)}#${r.name}${r.desc ?? ""}: ${r.kind === "field" ? "type" : "signature"} changed, now ${[...new Set(sameName)].slice(0, 3).join(", ")}`, r.where);
+      add(key, "error", `${r.kind} ${d(owner)}#${r.name}${fmtDesc(r.kind, r.desc ?? "")}: ${r.kind === "field" ? "type" : "signature"} changed, now ${[...new Set(sameName)].slice(0, 3).join(", ")}`, r.where);
       continue;
     }
     if (!complete) {
@@ -166,13 +168,18 @@ export function checkRefs(index: McIndex, refs: NmsRef[], opts: CheckOptions = {
     }
     const all = chain.flatMap((x) => pick(x).map(([n, ds]) => ({ n, ds })));
     const lname = r.name!.toLowerCase();
-    const similar = [...new Set(all.filter((x) => x.n.length > 2 && (lev(x.n.toLowerCase(), lname) <= 2 || (lname.length > 3 && x.n.toLowerCase().includes(lname)))).map((x) => `${x.n}${x.ds}`))].slice(0, 3);
-    const sameDesc = r.desc && !similar.length ? [...new Set(all.filter((x) => x.ds === r.desc && x.n !== "<init>").map((x) => x.n))].slice(0, 4) : [];
-    const sugg = similar.length ? `; similar: ${similar.join(", ")}` : sameDesc.length ? `; same ${r.kind === "field" ? "type" : "descriptor"}: ${sameDesc.join(", ")}` : "";
-    add(key, "error", `${r.kind} ${d(owner)}#${r.name}${r.desc ?? ""} not found${r.declared ? " (getDeclared*: declared in this class only)" : ""}${sugg}`, r.where);
+    const similar = [...new Set(all.filter((x) => x.n.length > 2 && (lev(x.n.toLowerCase(), lname) <= 2 || (lname.length > 3 && x.n.toLowerCase().includes(lname)))).map((x) => `${x.n}${fmtDesc(r.kind, x.ds)}`))].slice(0, 3);
+    // moved to another class? (same name elsewhere, e.g. ServerPlayer#latency → ServerCommonPacketListenerImpl#latency())
+    const elsewhere = r.name!.length > 2 ? index.search(r.name!, "any", 400).filter((h) => h.kind !== "class" && h.name === r.name && h.owner !== owner).slice(0, 3).map((h) => `${d(h.owner!)}#${h.name}${fmtDesc(h.kind as "field" | "method", h.desc!)}`) : [];
+    const obfNames = r.name!.length <= 2;
+    const sameDesc = obfNames && r.desc && r.kind === "method" ? [...new Set(all.filter((x) => x.ds === r.desc && x.n !== "<init>").map((x) => x.n))].slice(0, 4) : [];
+    const sugg = [similar.length ? `similar: ${similar.join(", ")}` : "", elsewhere.length ? `elsewhere: ${elsewhere.join(", ")}` : "", sameDesc.length ? `same descriptor: ${sameDesc.join(", ")}` : ""].filter(Boolean).join("; ");
+    add(key, "error", `${r.kind} ${d(owner)}#${r.name}${r.desc ? fmtDesc(r.kind, r.desc) : ""} not found${r.declared ? " (getDeclared*: declared in this class only)" : ""}${sugg ? `; ${sugg}` : ""}`, r.where);
   }
   return { problems: [...problems.values()], checked, unverifiable, skippedCraftBukkit: skippedCb };
 }
+
+const fmtDesc = (kind: string, desc: string) => (!desc ? "" : kind === "field" ? `: ${descToJava(desc).replace(/^.*\./, "")}` : desc);
 
 /** True when every supertype of the class is in the index (or java.lang.Object), so "not found" is reliable. */
 function chainComplete(index: McIndex, name: string): boolean {
