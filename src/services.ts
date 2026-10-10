@@ -1,3 +1,4 @@
+import { compareMcVersions } from "./util/mcversion.js";
 import { IndexService } from "./index/service.js";
 import { loadConfig, type BspConfig } from "./config.js";
 import { loadProfiles, type ProfileSet } from "./profiles/loader.js";
@@ -36,7 +37,12 @@ export async function versionFacts(services: Services, mc: string, notes: Notes 
     const d = await services.versions.mojangVersion(mc, notes);
     if (!d) {
       facts.known = false;
-      notes.warn(`Minecraft ${mc} is not in Mojang's version manifest; Java version and obfuscation could not be verified.`);
+      // extrapolate obfuscation from the newest known release below it (obfuscation does not come back)
+      const m = await services.versions.mojangManifest(notes);
+      const below = m.versions.filter((v) => v.type === "release" && compareMcVersions(v.id, mc) < 0).sort((a, b) => compareMcVersions(b.id, a.id))[0];
+      const prev = below && (await services.versions.mojangVersion(below.id, notes));
+      if (prev) facts.obfuscated = !!prev.mojangMappings;
+      notes.warn(`Minecraft ${mc} is not in Mojang's version manifest; Java version and obfuscation could not be verified${prev ? ` (obfuscation assumed as in ${below!.id})` : ""}.`);
       return facts;
     }
     Object.assign(facts, { known: true, javaMajor: d.javaMajor, mojangMappings: d.mojangMappings });
