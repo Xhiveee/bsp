@@ -13,6 +13,7 @@
  * Names that stay unknown are reported as "dynamic" (info), never as errors.
  */
 import { createRequire } from "node:module";
+import path from "node:path";
 import type { NmsRef } from "./refs.js";
 import { toInternal } from "./refs.js";
 
@@ -248,8 +249,17 @@ class Analyzer {
     // several different assignments (version branches): keep the first, it is a valid candidate
     if (!old || old.k === "unk") this.fieldAssigned.set(key, v);
   }
-  classNamed(n: string): ClassModel | undefined {
-    return this.byName.get(n)?.[0];
+  /** Same simple name in several packages: prefer the imported one, then the caller's package. */
+  classNamed(n: string, from?: ClassModel): ClassModel | undefined {
+    const all = this.byName.get(n) ?? [];
+    if (all.length < 2 || !from) return all[0];
+    const imp = from.imports.get(n)?.replace(/\./g, "/");
+    const norm = (f: string) => f.replace(/\\/g, "/");
+    return (
+      (imp && all.find((c) => norm(c.file).endsWith(`${imp}.java`))) ||
+      all.find((c) => path.posix.dirname(norm(c.file)) === path.posix.dirname(norm(from.file))) ||
+      all[0]
+    );
   }
   methodsNamed(n: string, cm?: ClassModel): Method[] {
     const own = cm?.methods.filter((m) => m.name === n) ?? [];
@@ -281,7 +291,11 @@ class Analyzer {
     return s.forNames.length > 0 || (s.ret.k === "cls" && s.ret.name.includes("{p")) || (s.ret.k === "str" && s.ret.s.includes("{p") && SERVER_DOTTED.test(s.ret.s));
   }
 
+  /** file → line ranges of try blocks whose catches swallow (no rethrow): failures there are handled probes. */
+  readonly swallowed = new Map<string, [number, number][]>();
   emit(r: NmsRef): void {
+    const [file, line] = [r.where.slice(0, r.where.lastIndexOf(":")), Number(r.where.slice(r.where.lastIndexOf(":") + 1))];
+    if (this.swallowed.get(file)?.some(([a, b]) => line >= a && line <= b)) r = { ...r, guarded: true };
     const key = `${r.kind}|${r.owner}|${r.name ?? ""}|${r.where}`;
     if (this.seen.has(key)) return;
     this.seen.add(key);
@@ -352,6 +366,7 @@ class Ev {
   // ---- statements ----
   /** Run a body; returns the first `return` value seen (summary). */
   block(ts: Tok[]): V | undefined {
+    this.markSwallowed(ts);
     let s = 0;
     let depth = 0;
     for (let i = 0; i <= ts.length; i++) {
@@ -365,6 +380,31 @@ class Ev {
       }
     }
     return this.ret;
+  }
+
+  private markSwallowed(ts: Tok[]): void {
+    for (let i = 0; i < ts.length; i++) {
+      if (ts[i]!.image !== "try") continue;
+      let o = i + 1;
+      if (ts[o]?.image === "(") o = matching(ts, o) + 1;
+      if (ts[o]?.image !== "{") continue;
+      const close = matching(ts, o);
+      let k = close + 1;
+      let catches = 0;
+      let rethrow = false;
+      while (ts[k]?.image === "catch" && ts[k + 1]?.image === "(") {
+        const b = matching(ts, k + 1) + 1;
+        if (ts[b]?.image !== "{") break;
+        const e = matching(ts, b);
+        if (ts.slice(b, e).some((t) => t.image === "throw")) rethrow = true;
+        catches++;
+        k = e + 1;
+      }
+      if (!catches || rethrow) continue;
+      const list = this.a.swallowed.get(this.cm.file) ?? [];
+      list.push([ts[o]!.startLine ?? 0, ts[close]!.startLine ?? 0]);
+      this.a.swallowed.set(this.cm.file, list);
+    }
   }
 
   private stmt(ts: Tok[]): void {
@@ -599,7 +639,7 @@ class Ev {
         const name = nameTok.image;
         if (this.peek() === "(") v = this.call(v, name, this.args(), nameTok);
         else if (v.k === "path") {
-          const cls = this.a.classNamed(v.parts[v.parts.length - 1]!);
+          const cls = this.a.classNamed(v.parts[v.parts.length - 1]!, this.cm);
           const fv = cls && v.parts.length === 1 ? this.a.field(cls, name) : undefined;
           v = fv ?? { k: "path", parts: [...v.parts, name] };
         } else if (name === "length" && v.k === "arr") v = { k: "num", n: v.items.length };
@@ -667,7 +707,7 @@ class Ev {
       }
       if (last === "MethodHandles" && (name === "lookup" || name === "privateLookupIn" || name === "publicLookup")) return { k: "lookup" };
       // project methods (unqualified: own class first; qualified: that class)
-      const target = q && q !== "this" ? this.a.classNamed(last) : this.cm;
+      const target = q && q !== "this" ? this.a.classNamed(last, this.cm) : this.cm;
       const ms = target ? target.methods.filter((m) => m.name === name && m.params.length === args.length) : [];
       const cands = ms.length ? ms : q === "" ? [] : this.a.methodsNamed(name).filter((m) => m.params.length === args.length && (!q || m.cls.name === last));
       if (cands.length) return this.applySummary(cands[0]!, args, tok);

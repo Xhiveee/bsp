@@ -23,6 +23,8 @@ export interface NmsRef {
   where: string;
   /** Reflective getDeclaredX: only members declared by the owner itself count. */
   declared?: boolean;
+  /** Inside a try block whose catch swallows the failure (probe / optional feature): problems are warnings. */
+  guarded?: boolean;
   /** Alternatives (version branches): the group is fine when any member resolves. */
   alt?: string;
   /** Resolved by a third-party library at runtime (best-effort name): problems are warnings. */

@@ -82,4 +82,24 @@ describe("javadoc index-all (JDK 8)", () => {
     expect(r.members).toEqual([{ p: "org.bukkit.entity", c: "Player", l: "getPing()", u: "getPing--" }]);
     expect(r.types).toEqual([{ p: "org.bukkit.entity", l: "Player" }]);
   });
+  it("marks Class.forName inside a swallowing try/catch as guarded, not a rethrowing one", () => {
+    const r = run({
+      "P.java": `package a;
+class P {
+  static void probe() {
+    try {
+      Class.forName("net.minecraft.nbt.NBTTagCompound");
+    } catch (Exception e) {
+    }
+    try {
+      Class.forName("net.minecraft.world.entity.Entity");
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+}`,
+    });
+    const g = Object.fromEntries(r.refs.map((x) => [x.owner, !!x.guarded]));
+    expect(g).toEqual({ "net/minecraft/nbt/NBTTagCompound": true, "net/minecraft/world/entity/Entity": false });
+  });
 });

@@ -56,6 +56,16 @@ describe("docs", () => {
 });
 
 describe("registry", () => {
+  it("Maven module inherits the platform dependency from its parent POM", async () => {
+    const dir = await project({
+      "pom.xml": "<project><modelVersion>4.0.0</modelVersion><groupId>g</groupId><artifactId>parent</artifactId><version>1</version><packaging>pom</packaging><modules><module>core</module></modules><properties><mc>1.16.4</mc></properties><dependencies><dependency><groupId>org.spigotmc</groupId><artifactId>spigot-api</artifactId><version>${mc}-R0.1-SNAPSHOT</version></dependency></dependencies></project>",
+      "core/pom.xml": "<project><parent><groupId>g</groupId><artifactId>parent</artifactId><version>1</version></parent><artifactId>core</artifactId></project>",
+      "core/src/main/java/a/A.java": "package a; class A {}",
+    });
+    const p = await readProjectInfo(path.join(dir, "core"));
+    expect(p).toMatchObject({ platform: "spigot", mcVersion: "1.16.4" });
+    expect(p.rootDir).toBe(dir);
+  });
   it("has exactly the 9 tools", () => {
     expect(TOOLS.map((t) => t.name)).toEqual(["list_versions", "get_profile", "search_server_source", "get_class", "translate_mapping", "nms_validate", "docs_search", "build", "analyze_crash"]);
     expect(TOOLS.filter((t) => t.readOnly === false).map((t) => t.name)).toEqual(["build"]);

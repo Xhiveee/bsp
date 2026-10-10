@@ -84,6 +84,8 @@ const PLATFORM_ARTIFACTS: { ga: RegExp; platform: Platform; nms?: NmsKind }[] = 
 
 // ---------------------------------------------------------------- Maven
 
+const stripXmlComments = (x: string) => x.replace(/<!--[\s\S]*?-->/g, "");
+
 function pomDeps(xml: string, extraProps: Record<string, string> = {}): { deps: Dep[]; modules: string[]; props: Record<string, string> } {
   const doc = new XMLParser({ ignoreAttributes: true, parseTagValue: false, isArray: (n) => ["dependency", "module", "plugin", "execution"].includes(n) }).parse(xml)?.project ?? {};
   const props: Record<string, string> = { ...extraProps };
@@ -221,12 +223,33 @@ export async function readProjectInfo(dirIn: string): Promise<ProjectInfo> {
   const gradleFile = ["build.gradle.kts", "build.gradle"].find((f) => existsSync(path.join(dir, f)));
   if (pom) {
     build = "maven";
-    // parent aggregator properties (one level up)
-    const parentPom = await readText(path.join(dir, "..", "pom.xml"));
-    const parentProps = parentPom ? pomDeps(parentPom).props : {};
-    if (parentPom && pomDeps(parentPom).modules.some((m) => path.resolve(dir, "..", m) === dir)) rootDir = path.dirname(dir);
-    const p = pomDeps(pom, parentProps);
-    deps = p.deps;
+    // parent POM chain (<parent><relativePath>, default ../pom.xml): properties, dependencies and
+    // dependencyManagement are inherited
+    const chain: { dir: string; xml: string }[] = [];
+    for (let cur = { dir, xml: pom }, i = 0; i < 4; i++) {
+      const rel = /<parent>[\s\S]*?<\/parent>/.exec(stripXmlComments(cur.xml))?.[0];
+      if (!rel) break;
+      const rp = /<relativePath>([^<]*)<\/relativePath>/.exec(rel)?.[1]?.trim() ?? "../pom.xml";
+      if (!rp) break;
+      const file = rp.endsWith(".xml") ? path.resolve(cur.dir, rp) : path.resolve(cur.dir, rp, "pom.xml");
+      const xml = await readText(file);
+      if (!xml) break;
+      chain.push({ dir: path.dirname(file), xml });
+      cur = { dir: path.dirname(file), xml };
+    }
+    let props: Record<string, string> = {};
+    const inherited: Dep[] = [];
+    for (const par of chain.reverse()) {
+      const pp = pomDeps(par.xml, props);
+      props = pp.props;
+      inherited.unshift(...pp.deps.map((d) => ({ ...d, via: `${d.via} (parent ${path.relative(dir, par.dir) || "."})` })));
+    }
+    const top = chain[0];
+    if (top && pomDeps(top.xml).modules.some((m) => path.resolve(top.dir, m) === dir)) rootDir = top.dir;
+    const p = pomDeps(pom, props);
+    deps = [...p.deps, ...inherited];
+    // versionless dependencies take their version from dependencyManagement
+    for (const d of deps) if (!d.version) d.version = deps.find((x) => x.version && x.group === d.group && x.artifact === d.artifact)?.version;
     modules = p.modules.map((m) => path.resolve(dir, m)).filter((m) => existsSync(m));
   } else if (gradleFile || existsSync(path.join(dir, "settings.gradle")) || existsSync(path.join(dir, "settings.gradle.kts"))) {
     build = "gradle";

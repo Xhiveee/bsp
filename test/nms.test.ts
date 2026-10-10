@@ -67,3 +67,18 @@ class A { void x() throws Exception {
     expect(refs.some((r) => r.owner.includes("{v}"))).toBe(true);
   });
 });
+
+describe("checkRefs without CraftBukkit classes", () => {
+  it("still checks the versioned CraftBukkit package", () => {
+    const noCb = new McIndex("/tmp/none", meta({ craftBukkitPackage: undefined }), classes.slice(0, 4));
+    const r = checkRefs(noCb, [ref({ kind: "class", owner: "org/bukkit/craftbukkit/v1_19_R3/entity/CraftPlayer", name: "" })], { expectedCb: "v1_20_R3" });
+    expect(r.problems.map((p) => p.text).join()).toMatch(/v1_19_R3: server has v1_20_R3/);
+    expect(r.skippedCraftBukkit).toBe(1);
+    const ok = checkRefs(noCb, [ref({ kind: "class", owner: "org/bukkit/craftbukkit/v1_20_R3/entity/CraftPlayer", name: "" })], { expectedCb: "v1_20_R3" });
+    expect(ok.problems).toEqual([]);
+  });
+  it("swallowed try/catch probes are warnings", () => {
+    const r = checkRefs(index, [ref({ kind: "class", owner: "net/minecraft/nbt/NBTTagCompound", name: "", origin: "reflection", guarded: true })]);
+    expect(r.problems.map((p) => p.severity)).toEqual(["warn"]);
+  });
+});

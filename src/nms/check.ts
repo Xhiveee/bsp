@@ -20,6 +20,8 @@ export interface CheckResult {
 export interface CheckOptions {
   /** Extra class suggestions from other namespaces (simple name → names in the index's namespace). */
   translateClass?: (internal: string) => string[];
+  /** CraftBukkit package segment the server uses ("" = unversioned) when the index itself has no CraftBukkit: package checks only. */
+  expectedCb?: string;
 }
 
 const d = (n: string) => n.replace(/\//g, ".");
@@ -75,10 +77,14 @@ function checkCore(index: McIndex, refs: NmsRef[], opts: CheckOptions): CheckRes
   const pk = indexPackages(index);
   const problems = new Map<string, Problem>();
   let soft = false;
+  let guarded = false;
   const add = (key: string, severity: Problem["severity"], text: string, where: string) => {
     if (soft && severity === "error") {
       severity = "warn";
       text += " (name built by a reflection library at runtime — best-effort check)";
+    } else if (guarded && severity === "error") {
+      severity = "warn";
+      text += " (inside try/catch that swallows the failure — probe or optional path?)";
     }
     const p = problems.get(key);
     if (p) {
@@ -105,17 +111,19 @@ function checkCore(index: McIndex, refs: NmsRef[], opts: CheckOptions): CheckRes
     }
     const m = VERSION_SEG.exec(name);
     if (isCb) {
-      if (pk.cb === undefined) return name; // no CraftBukkit in index: caller skips
+      const cb = pk.cb ?? opts.expectedCb;
+      if (cb === undefined) return name; // no CraftBukkit in index: caller skips
       const rest = m ? name.slice(m[0].length) : name.slice("org/bukkit/craftbukkit/".length);
       const seg = m?.[2];
-      if (seg && seg !== pk.cb) {
-        const sev = pk.cb === "" && r.origin !== "reflection" ? "warn" : "error";
-        add(`pkg ${seg}`, sev, pk.cb === ""
+      if (seg && seg !== cb) {
+        const sev = cb === "" && r.origin !== "reflection" ? "warn" : "error";
+        add(`pkg ${seg}`, sev, cb === ""
           ? `org.bukkit.craftbukkit.${seg}: this server has no versioned CraftBukkit package${sev === "warn" ? " (Paper rewrites compiled refs at load for now — PaperMC announced removing this)" : "; reflection strings are not rewritten"}`
-          : `org.bukkit.craftbukkit.${seg}: server has ${pk.cb} → NoClassDefFoundError/ClassNotFoundException (versioned package)`, r.where);
+          : `org.bukkit.craftbukkit.${seg}: server has ${cb} → NoClassDefFoundError/ClassNotFoundException (versioned package)`, r.where);
       }
-      if (!seg && pk.cb) add(`pkg none`, "error", `org.bukkit.craftbukkit.${d(rest)}: CraftBukkit is org.bukkit.craftbukkit.${pk.cb}.* on this version (unversioned only from Paper 1.20.5)`, r.where);
-      return pk.cb ? `org/bukkit/craftbukkit/${pk.cb}/${rest}` : `org/bukkit/craftbukkit/${rest}`;
+      if (!seg && cb) add(`pkg none`, "error", `org.bukkit.craftbukkit.${d(rest)}: CraftBukkit is org.bukkit.craftbukkit.${cb}.* on this version (unversioned only from Paper 1.20.5)`, r.where);
+      if (pk.cb === undefined) return name;
+      return cb ? `org/bukkit/craftbukkit/${cb}/${rest}` : `org/bukkit/craftbukkit/${rest}`;
     }
     if (m && m[1] === "net/minecraft/server") {
       if (pk.nms === m[2]) return name;
@@ -151,6 +159,7 @@ function checkCore(index: McIndex, refs: NmsRef[], opts: CheckOptions): CheckRes
 
   for (const r0 of refs) {
     soft = !!r0.soft;
+    guarded = !!r0.guarded;
     const owner = normalize(r0.owner, r0);
     if (!owner) continue;
     const r = { ...r0, owner, desc: r0.desc ? nd(r0.desc, r0) : undefined };

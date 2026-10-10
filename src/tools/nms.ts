@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { z } from "zod";
 import path from "node:path";
 import type { McIndex } from "../index/store.js";
@@ -21,7 +22,8 @@ interface ModuleReport {
 export async function nmsValidate(services: Services, a: A) {
   const root = await readProjectInfo(a.projectDir);
   const mods: ProjectInfo[] = [];
-  if (root.mcVersion) mods.push(root);
+  // an aggregator root only counts when it has code of its own
+  if (root.mcVersion && (!root.modules.length || existsSync(path.join(root.dir, "src")))) mods.push(root);
   for (const m of root.modules) {
     try {
       const info = await readProjectInfo(m);
@@ -113,7 +115,11 @@ async function validateModule(services: Services, info: ProjectInfo, a: A, rootD
       continue;
     }
     const translateClass = await translator(services, target, ns, list);
-    const r = checkRefs(index, list, { translateClass });
+    // index without CraftBukkit (Spigot without BuildTools): still check the versioned CraftBukkit package
+    let expectedCb: string | undefined;
+    if (index.meta.craftBukkitPackage === undefined && platform !== "paper" && list.some((x) => x.owner.startsWith("org/bukkit/craftbukkit/")))
+      expectedCb = await services.versions.craftBukkit(target).then((cb) => (cb ? (cb.packageVersion ? `v${cb.packageVersion}` : "") : undefined), () => undefined);
+    const r = checkRefs(index, list, { translateClass, expectedCb });
     out.push(`${label}: ${info.platform} ${info.mcVersion}${info.nms !== "none" ? ` (${info.nms})` : ""} vs ${index.meta.label}, ${index.meta.namespace} names${ns === runtimeNs && ns !== devNs ? " (reflection: runtime names)" : ""}.`);
     for (const n of notes) out.push(`note: ${n}`);
     problems.push(...r.problems);
@@ -125,7 +131,7 @@ async function validateModule(services: Services, info: ProjectInfo, a: A, rootD
   const limit = a.limit ?? 40;
   for (const p of problems.slice(0, limit)) out.push(`${p.severity}: ${p.text} | ${p.where[0]}${p.where.length > 1 ? ` (+${p.where.length - 1})` : ""}`);
   if (problems.length > limit) out.push(`… ${problems.length - limit} more (limit=)`);
-  out.push(`${checked} refs checked (${bcFiles} class files, ${srcFiles} sources)${unverifiable ? `, ${unverifiable} unverifiable (inherited from non-server types)` : ""}${skippedCb ? `, ${skippedCb} CraftBukkit refs unchecked (index has no CraftBukkit)` : ""}.`);
+  out.push(`${checked} refs checked (${bcFiles} class files, ${srcFiles} sources)${unverifiable ? `, ${unverifiable} unverifiable (inherited from non-server types)` : ""}${skippedCb ? `, ${skippedCb} CraftBukkit refs: package only (no CraftBukkit classes; buildtools=true for full check)` : ""}.`);
   if (dynamic.length) out.push(`info: ${dynamic.length} reflective name(s) built at runtime, not checkable statically: ${[...new Set(dynamic)].slice(0, 3).join("; ")}${dynamic.length > 3 ? " …" : ""}`);
   if (devNs !== runtimeNs && !rt.length && refs.some((r) => r.origin === "reflection")) out.push("note: reflection strings are not remapped by reobf/SpecialSource — they must use runtime names.");
   return { label, lines: out, problems: problems.length + (apiNote?.startsWith("error") ? 1 : 0) };
