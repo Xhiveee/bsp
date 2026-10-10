@@ -24,6 +24,7 @@ import { downloadFile } from "../util/download.js";
 import { completeWithObf, emptySet, fillFieldDescs, MappingTable, parseProguard, parseSpigotMappings, writeTinyV2, type MappingSet } from "./mappings.js";
 import { indexJar, McIndex, vineflowerDecompile, vineflowerDecompileMany, type IndexMeta } from "./store.js";
 import { toolJar, toolJava } from "./tooljars.js";
+import { addSpigotAutoMembers } from "./automember.js";
 
 export type IndexSource = "auto" | "paper" | "spigot" | "vanilla";
 
@@ -105,8 +106,9 @@ export class IndexService {
     if (!mc) throw new Error("Give mcVersion or projectDir.");
     if (project && spec.mcVersion && spec.mcVersion !== project.mcVersion) notes.push(`mcVersion ${spec.mcVersion} differs from the project's ${project.mcVersion}; using ${spec.mcVersion}.`);
     const platform: Platform = spec.platform ?? project?.platform ?? "paper";
+    // default names = what a plugin of this platform/version is written in (profile dev mappings)
     let ns = spec.mappings ?? project?.devMappings;
-    if (!ns && project) {
+    if (!ns) {
       try {
         ns = (await lookupProfile(this.services, platform, mc)).profile.nms.devMappings;
       } catch {
@@ -114,6 +116,7 @@ export class IndexService {
       }
     }
     ns ??= await this.defaultNamespace(mc);
+    const explicitNs = !!spec.mappings;
     const source = spec.source ?? "auto";
     const jarPath = spec.serverJar ?? (source === "auto" ? project?.serverJar : undefined);
 
@@ -135,7 +138,7 @@ export class IndexService {
       try {
         const index = await this.openPaper(mc, ns, onProgress);
         if (index.meta.namespace !== ns) {
-          if (source === "paper") notes.push(`Paper ${mc} offers only ${index.meta.namespace} names (asked: ${ns}).`);
+          if (source === "paper" || !explicitNs) notes.push(`Paper ${mc} offers only ${index.meta.namespace} names (wanted ${ns}).`);
           else throw new Error(`Paper ${mc} ships ${index.meta.namespace} names, not ${ns}`);
         }
         return { index, notes: [...notes, ...index.meta.notes], project };
@@ -319,7 +322,7 @@ export class IndexService {
   }
 
   /** Spigot names (obf → spigot) from BuildData at the BuildTools commit, with CraftBukkit's NMS relocations. */
-  async spigotSet(mc: string): Promise<{ set: MappingSet; commit: string; relocated?: string } | undefined> {
+  async spigotSet(mc: string, allClasses?: Iterable<string>): Promise<{ set: MappingSet; commit: string; relocated?: string; mapCommands?: string } | undefined> {
     const v = this.services.versions;
     const bd = await v.buildData(mc);
     if (!bd?.info.classMappings) return undefined;
@@ -331,8 +334,8 @@ export class IndexService {
     ]);
     if (!cl) return undefined;
     const nmsRel = (cb?.relocations ?? []).filter((r) => /net[./]minecraft|com[./]mojang/.test(r.pattern));
-    const set = parseSpigotMappings(cl, members, pkg, (n) => relocate(n, nmsRel));
-    return { set, commit: bd.commit, relocated: cb?.packageVersion };
+    const set = parseSpigotMappings(cl, members, pkg, (n) => relocate(n, nmsRel), allClasses);
+    return { set, commit: bd.commit, relocated: cb?.packageVersion, mapCommands: [bd.info.classMapCommand, bd.info.memberMapCommand].filter(Boolean).join(" ") };
   }
 
   private async buildVanilla(mc: string, ns: MappingNs, platform: Platform, onProgress?: (m: string) => void): Promise<McIndex> {
@@ -348,10 +351,12 @@ export class IndexService {
         set = await this.mojangSet(mc);
         if (!set) throw new Error(`Mojang published no mappings for ${mc} (they start with 1.14.4). Use mappings=spigot.`);
       } else {
-        const sp = await this.spigotSet(mc);
+        const obfIdx = indexJar(serverJar);
+        const sp = await this.spigotSet(mc, obfIdx.map((c) => c.n));
         if (!sp) throw new Error(`No Spigot BuildData class mappings for ${mc}.`);
         set = sp.set;
-        const obfIdx = indexJar(serverJar);
+        const modes = [...`${sp.mapCommands ?? ""}`.matchAll(/--auto-member (\w+)/g)].map((m) => m[1]!);
+        if (modes.length) addSpigotAutoMembers(serverJar, set, modes);
         const fdesc = new Map(obfIdx.flatMap((c) => c.f.map(([n, d]) => [`${c.n}\t${n}`, d] as const)));
         fillFieldDescs(set, (o, n) => fdesc.get(`${o}\t${n}`));
         notes.push(`Spigot names from BuildData ${sp.commit.slice(0, 10)}${sp.relocated ? ` (NMS relocated to v${sp.relocated})` : ""}; most members stay obfuscated, as on a real Spigot server.`);

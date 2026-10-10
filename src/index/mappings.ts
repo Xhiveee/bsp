@@ -15,7 +15,7 @@ export interface MappingSet {
   methods: Map<string, string[]>;
 }
 
-const key = (owner: string, name: string, desc: string) => `${owner}\t${name}\t${desc}`;
+export const key = (owner: string, name: string, desc: string) => `${owner}\t${name}\t${desc}`;
 
 export function emptySet(namespaces: string[]): MappingSet {
   return { namespaces, classes: new Map(), fields: new Map(), methods: new Map() };
@@ -64,7 +64,12 @@ export function parseProguard(text: string, into: MappingSet = emptySet(["obf", 
  * or `owner obf desc spigot` (method) with owner/desc in Spigot names. package.srg (`./ net/minecraft/server/`) moves
  * default-package classes; `relocate` applies CraftBukkit's shade relocations (pre-1.17: flat net/minecraft/server/v1_X_RY).
  */
-export function parseSpigotMappings(cl: string, members: string | undefined, packages: string | undefined, relocate: (n: string) => string = (n) => n): MappingSet {
+/**
+ * Spigot names from BuildData (cl/members csrg + package.srg) and CraftBukkit's relocations. With `allClasses` (the
+ * obf jar's class names) every class gets a name, as SpecialSource + shade give them: inner classes follow their outer
+ * class, unmapped classes get the package mapping, and the relocation applies to the whole jar.
+ */
+export function parseSpigotMappings(cl: string, members: string | undefined, packages: string | undefined, relocate: (n: string) => string = (n) => n, allClasses?: Iterable<string>): MappingSet {
   const set = emptySet(["obf", "spigot"]);
   const pkg: [string, string][] = [];
   for (const line of (packages ?? "").split(/\r?\n/)) {
@@ -88,6 +93,22 @@ export function parseSpigotMappings(cl: string, members: string | undefined, pac
     toSpigot.set(obf, fin);
     unrelocated.set(named, obf);
     set.classes.set(obf, [obf, fin]);
+  }
+  if (allClasses) {
+    const named = (obf: string): string => {
+      const hit = toSpigot.get(obf);
+      if (hit) return hit;
+      const i = obf.lastIndexOf("$");
+      const fin = i > 0 ? `${named(obf.slice(0, i))}${obf.slice(i)}` : relocate(applyPkg(obf));
+      toSpigot.set(obf, fin);
+      return fin;
+    };
+    const used = new Set([...set.classes.values()].map((v) => v[1]!));
+    for (const c of allClasses) if (!set.classes.has(c)) {
+      const fin = named(c);
+      // first wins on collisions (e.g. net/minecraft/data/Main vs server/Main: Spigot ships no data generator)
+      if (fin !== c && !used.has(fin)) set.classes.set(c, [c, fin]), used.add(fin);
+    }
   }
   const ownerObf = (n: string) => unrelocated.get(n) ?? n;
   for (const line of (members ?? "").split(/\r?\n/)) {

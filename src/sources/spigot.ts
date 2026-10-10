@@ -29,6 +29,8 @@ export interface BuildDataInfo {
   memberMappings?: string;
   packageMappings?: string;
   accessTransforms?: string;
+  classMapCommand?: string;
+  memberMapCommand?: string;
   toolsVersion?: number;
 }
 export function parseBuildDataInfo(json: string): BuildDataInfo {
