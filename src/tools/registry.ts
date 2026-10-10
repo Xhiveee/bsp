@@ -36,7 +36,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "search_server_source",
     title: "Search server code",
-    description: "Search NMS, CraftBukkit and Bukkit/Paper API classes/methods/fields of a version, grep source text (decompiled lazily), or find usages from bytecode. Paged one-line results.",
+    description: "Search NMS, CraftBukkit and Bukkit/Paper API classes/methods/fields of a version, grep source text (decompiled lazily), find usages or callees from bytecode, browse packages. Paged one-line results.",
     input: S.searchInput,
     load: async () => (await import("./source.js")).searchServerSource as Impl,
   },

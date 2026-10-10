@@ -44,6 +44,8 @@ Spigot-имена для обфусцированных версий счита�
 
 ## Инструменты — детали
 
+- **search_server_source**: `kind: usages` — кто вызывает метод / читает поле / использует класс (байткод, вызовы через подклассы помечены `via`). `kind: callees` (`query: Class#method[(desc)]`) — обратное направление: что метод вызывает (`call`), читает/пишет (`get`/`put`), передаёт как method reference (`ref`); тела лямбд того же класса раскрываются и помечаются `(lambda)`; без дескриптора перегрузки группируются (до 5). `kind: packages` (`query`: пакет, уникальный хвост вроде `craftbukkit.entity` или `.` — корень) — подпакеты с числом классов, затем классы пакета с пометками `interface`/`enum`/`record`/`abstract`, 100 на страницу. Имена — те же, что у индекса (Mojang/Spigot, `v1_X_RY`).
+
 - **list_versions** без версии: сводная таблица (Paper, Spigot, spigot-api, paper-api). С версией: Java, обфускация, билд и ссылка Paper, артефакты API/dev-bundle, нужна ли BuildTools, пакет CraftBukkit.
 - **get_profile**: конкретные координаты (последние версии из metadata), NMS-подход, версия Gradle по требованиям плагинов, `api-version`; `build: gradle|maven` — готовый сниппет (paperweight, `javaLauncher` для старых dev-bundle, MOJANG_PRODUCTION, SpecialSource-исполнения для Spigot remapped-mojang).
 - **translate_mapping**: класс/метод/поле между `mojang`, `spigot`, `obf`; без `from` пробует по очереди. CraftBukkit не маппится — меняется только пакет. Для 26.x — тождественно.

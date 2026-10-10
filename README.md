@@ -86,7 +86,7 @@ FFN и BSP можно подключить одновременно — это �
 
 - `list_versions` (`mcVersion?`) — версии Paper / Spigot / API с Java; с `mcVersion` — билд Paper, артефакты API и dev-bundle, пакет CraftBukkit, нужна ли BuildTools.
 - `get_profile` (`mcVersion`, `platform`, `build?`) — как собрать плагин: Java, зависимости, NMS-подход (paperweight / remapped-mojang / v1_X_RY), версия Gradle, api-version, готовый `build.gradle.kts` или `pom.xml`.
-- `search_server_source` (`query`, `kind`: имена / `text` / `usages`, `mcVersion` или `projectDir`) — поиск по классам сервера: NMS, CraftBukkit, API.
+- `search_server_source` (`query`, `kind`: имена / `text` / `usages` / `callees` / `packages`, `mcVersion` или `projectDir`) — поиск по классам сервера (NMS, CraftBukkit, API), кто вызывает метод (`usages`) и что вызывает он сам (`callees`), обзор пакета: подпакеты и классы (`packages`, `query: "."` — корень).
 - `get_class` (`className`, `method?`, `detail`: `outline` / `hierarchy` / `full`) — класс кратко, исходник одного метода, иерархия или полный исходник постранично.
 - `translate_mapping` (`mcVersion`, `name`, `from?`) — Mojang ↔ Spigot ↔ obf, перенос `v1_X_RY`-пакетов и CraftBukkit.
 - `nms_validate` (`projectDir`, `targetVersion?`, `buildtools?`) — проверяет NMS/CraftBukkit-ссылки плагина по реальному серверу: байткод, импорты и рефлексию (Java-парсер + интерпретатор строк: версия из пакета CraftServer, конкатенация, StringBuilder, String.format, константы, обёртки вроде `getNMSClass`, `MethodHandles`, XSeries/MinecraftReflection). С `targetVersion` показывает, что сломается при обновлении. Имена, которые нельзя вычислить статически, выводятся как info, а не как ошибки.

@@ -6,10 +6,10 @@
 
 | | токены |
 |---|---|
-| tools/list, 9 инструментов | ≈2 830 (0.1: ≈2 740; +`buildtools`) |
+| tools/list, 9 инструментов | ≈2 880 (0.2: ≈2 830; 0.3: +47 за `callees`/`packages`) |
 | instructions сервера | ≈177 |
 
-По инструментам: list_versions 170, get_profile 210, search_server_source 482, get_class 589, translate_mapping 258, nms_validate 361, docs_search 311, build 231, analyze_crash 218.
+По инструментам: list_versions 170, get_profile 210, search_server_source 529, get_class 589, translate_mapping 258, nms_validate 361, docs_search 311, build 231, analyze_crash 218.
 
 Запуск: медиана ≈270 мс, RSS ≈76 МБ (реализации инструментов грузятся при первом вызове).
 

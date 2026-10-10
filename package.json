@@ -1,6 +1,6 @@
 {
   "name": "bsp-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "BSP (BukkitSpigotPaper): an MCP server for developing Bukkit/Spigot/Paper plugins (1.13 → latest): real server classes (NMS, CraftBukkit, API), mappings, NMS checks, builds and docs, driven by live version data and declarative profiles.",
   "type": "module",
   "license": "MIT",
