@@ -42,7 +42,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): BspConfig {
     cacheDir: env.BSP_CACHE_DIR ?? path.join(defaultCacheHome(), "bsp"),
     cacheTtlMs: (Number.isFinite(ttlMin) && ttlMin >= 0 ? ttlMin : 360) * 60_000,
     offline: env.BSP_OFFLINE === "1" || env.BSP_OFFLINE === "true",
-    userAgent: env.BSP_USER_AGENT ?? "BSP-MCP/0.1 (Bukkit/Spigot/Paper plugin dev MCP server; +https://github.com/Xhiveee/bsp)",
+    userAgent: env.BSP_USER_AGENT ?? "BSP-MCP/0.2 (Bukkit/Spigot/Paper plugin dev MCP server; +https://github.com/Xhiveee/bsp)",
     mavenLocal: env.BSP_MAVEN_LOCAL ?? path.join(os.homedir(), ".m2", "repository"),
     buildToolsDirs: (env.BSP_BUILDTOOLS_DIRS ?? "").split(path.delimiter).filter(Boolean),
   };

@@ -9,7 +9,7 @@
 | Java, наличие Mojang-маппингов, server.jar | Mojang version manifest v2 |
 | paper-api, dev-bundle, spigot-api, bukkit | `maven-metadata.xml` на repo.papermc.io и hub.spigotmc.org/nexus |
 | paperweight-userdev, shadow и их требования (минимальный Gradle, JVM) | Gradle Plugin Portal: marker pom → Gradle module metadata (`org.gradle.plugin.api-version`, `org.gradle.jvm.version`) |
-| Документация | архив PaperMC/docs (paper/dev, adventure, folia), посты PaperMC/website (новости релизов), javadoc-индексы jd.papermc.io, hub.spigotmc.org/javadocs, jd.advntr.dev |
+| Документация | архив PaperMC/docs (paper/dev, adventure, folia), посты PaperMC/website (новости релизов), javadoc-индексы jd.papermc.io (по версиям), javadoc-jar `spigot-api`/`bukkit` `<версия>-R0.1-SNAPSHOT` из hub.spigotmc.org/nexus (по версиям, распаковываются в кэш; иначе hub.spigotmc.org/javadocs — последняя), jd.advntr.dev |
 
 Ничего версионного в коде не зашито: всё, что меняется между версиями, — правила в `profiles/*.yaml`.
 
@@ -34,7 +34,7 @@
 `search_server_source`, `get_class`, `nms_validate` работают по индексу классов (имена, дескрипторы, наследование, байткод-ссылки) и лениво декомпилируют нужные классы Vineflower.
 
 - `source: paper` (по умолчанию для Paper): Paperclip-jar с Fill распаковывается `java -Dpaperclip.patchonly=true` — сервер не запускается, `eula.txt` не создаётся; рабочая папка удаляется после индексации. Содержит NMS + CraftBukkit + API.
-- `source: spigot`: вывод BuildTools из `~/.m2` или `BSP_BUILDTOOLS_DIRS` (сам BuildTools BSP не запускает).
+- `source: spigot`: вывод BuildTools из `~/.m2` (`spigot-<v>-R0.1-SNAPSHOT[-remapped-mojang].jar`), `BSP_BUILDTOOLS_DIRS` или кэша BSP. С `buildtools: true` и без такого jar BSP запускает официальный BuildTools.jar (Jenkins lastSuccessfulBuild, обновляется раз в неделю): `java -jar BuildTools.jar --rev <v> --output-dir <кэш>/buildtools/out/<v> --nogui [--remapped]`. JDK — новейшая из диапазона `javaVersions` версии SpigotMC. Одновременно идёт один запуск на версию, лог — `<кэш>/buildtools/logs`. BuildTools только собирает jar, сервер не запускается.
 - `source: vanilla`: server.jar Mojang + API-jar, переименованный в нужные имена (tiny-remapper). Без CraftBukkit.
 - `serverJar`: любой jar (например, системная зависимость проекта).
 
@@ -47,10 +47,10 @@ Spigot-имена для обфусцированных версий счита�
 - **list_versions** без версии: сводная таблица (Paper, Spigot, spigot-api, paper-api). С версией: Java, обфускация, билд и ссылка Paper, артефакты API/dev-bundle, нужна ли BuildTools, пакет CraftBukkit.
 - **get_profile**: конкретные координаты (последние версии из metadata), NMS-подход, версия Gradle по требованиям плагинов, `api-version`; `build: gradle|maven` — готовый сниппет (paperweight, `javaLauncher` для старых dev-bundle, MOJANG_PRODUCTION, SpecialSource-исполнения для Spigot remapped-mojang).
 - **translate_mapping**: класс/метод/поле между `mojang`, `spigot`, `obf`; без `from` пробует по очереди. CraftBukkit не маппится — меняется только пакет. Для 26.x — тождественно.
-- **nms_validate**: собирает ссылки из `target/classes` / `build/classes` (constant pool, дескрипторы, супертипы), из исходников — импорты и рефлексию (`Class.forName`, `getDeclaredMethod/Field`, шаблоны `"net.minecraft.server." + v + ".X"`). Рефлексия проверяется в runtime-именах (её не ремапит ни reobf, ни SpecialSource). Подсказки: «now …» для пропавших `v1_X_RY`, похожие имена, тот же член в других классах, изменённая сигнатура. CraftBukkit: версионированный пакет против неверсионированного сервера — warn (Paper пока переписывает при загрузке), рефлексия — error.
+- **nms_validate**: собирает ссылки из `target/classes` / `build/classes` (constant pool, дескрипторы, супертипы), из исходников — импорты и рефлексию. Исходники разбираются java-parser (CST), выражения вычисляет абстрактный интерпретатор: строки, конкатенация, `StringBuilder`, `String.format/join/valueOf`, `split/substring/replace`, константы и поля (включая присваивания в конструкторах и static-блоках), тернарники (варианты = альтернативы: достаточно, чтобы прошёл один), обёртки (метод, строящий имя из параметра, распознаётся по телу), `MethodHandles.Lookup.find*`, `getMethod/getField/getDeclared*`, `Bukkit.getServer().getClass().getPackage()` → версия. В байткоде читаются рецепты `invokedynamic` string concat. Вызовы библиотек (`getNMSClass`, `getCraftClass`, XSeries/MinecraftReflection) дают «мягкие» ссылки (warn). Ссылки внутри `try/catch`, который глотает ошибку, тоже дают warn. Невычислимые имена выводятся как info. Maven-модули наследуют зависимости и dependencyManagement родительского POM. Рефлексия проверяется в runtime-именах (её не ремапит ни reobf, ни SpecialSource). Подсказки: «now …» для пропавших `v1_X_RY`, похожие имена, тот же член в других классах, изменённая сигнатура. CraftBukkit: версионированный пакет против неверсионированного сервера — warn (Paper пока переписывает при загрузке), рефлексия — error.
 - **build**: Gradle (wrapper обязателен) или Maven (mvnw → mvn → скачанный Apache Maven). JDK подбирается по профилю, paperweight требует 21+, `--release` у Maven собирает старые цели на JDK 17. Лог — в `<проект>/.bsp/logs`.
 - **analyze_crash**: виды находок: compile_error, jvm_mismatch, toolchain_missing, dependency_resolution, build_failure, plugin_load, missing_dependency, api_version, plugin_yml, duplicate_plugin, plugin_error, class_not_found, nms_mismatch, linkage_error, async_access, watchdog, out_of_memory, eula, crash. Виновник — по имени плагина в сообщениях и jar в стеке; если падают несколько независимых плагинов, выводится их список.
-- **docs_search**: BM25 по разделам документации; новости фильтруются по версии; javadoc — индексы типов и членов (`Class#member`). URL проверяются.
+- **docs_search**: BM25 по разделам документации; новости фильтруются по версии; javadoc — индексы типов и членов (`Class#member`), для JDK 8 — `index-all.html`; якоря старого вида (`m-int-`) подставляются по странице. Если запрос — идентификатор API, javadoc выводится первым, а статей — не больше двух. URL проверяются.
 
 ## Архитектура
 
